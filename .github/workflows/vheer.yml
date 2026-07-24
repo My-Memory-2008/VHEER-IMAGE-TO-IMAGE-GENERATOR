@@ -1,4 +1,4 @@
-name: Vheer Automated Image Generation Engine
+name: Vheer Repository Image Generation Engine
 on:
   workflow_dispatch:
     inputs:
@@ -8,8 +8,9 @@ on:
         default: 'remove the jacket'
         type: string
       image_name:
-        description: 'Exact name of the source image inside your workspace root (e.g. input.jpg)'
+        description: 'The repo file name (e.g., input-image or input-image.jpg)'
         required: true
+        default: 'input-image'
         type: string
 
 jobs:
@@ -18,17 +19,30 @@ jobs:
     steps:
       - name: Run Complete Vheer Pipeline
         run: |
-          # 1. Clone Code Tree and Initialize Directory
+          # 1. Clone your repository code tree into the runner workspace
           uses=actions/checkout@v4 
           node_setup=actions/setup-node@v4
           mkdir -p output
           npm init -y
           
-          # 2. Fetch Core Runtime and Automated Cloudflare-Bypass Dependencies
+          # 2. Check for the committed file matching 'input-image'
+          echo "Searching for target image file in repository..."
+          TARGET_FILE=$(find . -maxdepth 1 -name "${{ inputs.image_name }}*" -print -quit)
+          
+          if [ -z "$TARGET_FILE" ]; then
+            echo "::error:: Could not find any repository file matching '${{ inputs.image_name }}'"
+            exit 1
+          fi
+          
+          # Strip the leading './' to make it a clean filename string
+          CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
+          echo "Found target repository file: $CLEAN_FILE_NAME"
+          
+          # 3. Fetch Runtime and Automated Cloudflare-Bypass Dependencies
           npm install @playwright/test playwright playwright-extra automation-extra-plugin-stealth
           npx playwright install --with-deps chromium
           
-          # 3. Create the Automation Test File
+          # 4. Create the Automation Test File
           cat << 'EOF' > run_vheer.test.js
           const { test } = require('@playwright/test');
           const { chromium } = require('playwright-extra');
@@ -45,16 +59,16 @@ jobs:
             const page = await context.newPage();
 
             console.log("Navigating to Vheer Workspace...");
-            await page.goto('https://vheer.com/app/image-to-image#google_vignette', { waitUntil: 'networkidle' });
+            await page.goto('https://vheer.com', { waitUntil: 'networkidle' });
             await page.waitForTimeout(4000);
 
-            // Locate hidden file upload container dynamically
-            console.log("Locating upload targets...");
+            // Inject the matching repository file found by the runner
+            console.log(`Locating upload targets for: ${process.env.DETECTED_IMAGE_FILE}`);
             const fileInput = page.locator('input[type="file"]');
             if (await fileInput.count() > 0) {
-              await fileInput.setInputFiles(process.env.IMAGE_FILE);
+              await fileInput.setInputFiles(process.env.DETECTED_IMAGE_FILE);
             } else {
-              await page.setInputFiles('input[type="file"]', process.env.IMAGE_FILE);
+              await page.setInputFiles('input[type="file"]', process.env.DETECTED_IMAGE_FILE);
             }
             await page.waitForTimeout(2000);
 
@@ -98,11 +112,11 @@ jobs:
           });
           EOF
 
-          # 4. Fire execution within a Spoofed Virtual Display Frame Buffer
+          # 5. Fire execution within a Spoofed Virtual Display Frame Buffer
           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npx playwright test run_vheer.test.js
         env:
           PROMPT_TEXT: ${{ inputs.prompt }}
-          IMAGE_FILE: ${{ inputs.image_name }}
+          DETECTED_IMAGE_FILE: $CLEAN_FILE_NAME
 
       - name: Export Generated Output Graphic
         uses: actions/upload-artifact@v4
