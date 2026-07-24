@@ -59,7 +59,7 @@ jobs:
             const page = await context.newPage();
 
             console.log("Navigating to Vheer Workspace...");
-            await page.goto('https://vheer.com', { waitUntil: 'networkidle' });
+            await page.goto('https://vheer.com/app/image-to-image#google_vignette', { waitUntil: 'networkidle' });
             await page.waitForTimeout(4000);
 
             // Inject the matching repository file found by the runner
