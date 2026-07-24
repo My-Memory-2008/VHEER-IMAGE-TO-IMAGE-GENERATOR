@@ -1,0 +1,126 @@
+name: Vheer Monolithic Generation Engine
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'AI Target Modification Prompt'
+        required: true
+        default: 'remove the jacket'
+        type: string
+      image_name:
+        description: 'Exact name of the source image inside your workspace root (e.g. input.jpg)'
+        required: true
+        type: string
+
+jobs:
+  execute-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Clone Code Tree
+        uses: actions/checkout@v4
+
+      - name: 2. Core Workspace Initialization
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 3. Fetch Core Runtime Dependencies
+        run: |
+          npm init -y
+          npm install @playwright/test playwright playwright-extra automation-extra-plugin-stealth
+          npx playwright install --with-deps chromium
+
+      - name: 4. Compile and Run Monolithic Script
+        # This compiles the configuration file on-the-fly and runs it directly via xvfb
+        run: |
+          mkdir -p output
+          
+          cat << 'EOF' > inline_automation.test.js
+          const { test, expect } = require('@playwright/test');
+          const { chromium } = require('playwright-extra');
+          const stealth = require('automation-extra-plugin-stealth')();
+
+          chromium.use(stealth);
+
+          test('Vheer Self-Authenticating Event Stream Pipeline', async () => {
+            console.log("Launching Stealth Engine...");
+            const browser = await chromium.launch({ headless: false }); 
+            const context = await browser.newContext({
+              viewport: { width: 1280, height: 720 },
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+            });
+            
+            const page = await context.newPage();
+            const inputImage = process.env.IMAGE_FILE;
+            const inputPrompt = process.env.PROMPT_TEXT;
+
+            console.log("Navigating directly to Vheer Workspace...");
+            await page.goto('https://vheer.com/app/image-to-image', { waitUntil: 'networkidle' });
+            await page.waitForTimeout(3000); 
+
+            console.log(`Injecting Source Image Asset: ${inputImage}`);
+            await page.locator('input[type="file"]').setInputFiles(inputImage);
+            await page.waitForTimeout(1500);
+
+            console.log(`Injecting Prompt: "${inputPrompt}"`);
+            const promptBox = page.getByRole('textbox', { name: 'Describe how you want to' });
+            await promptBox.click();
+            await promptBox.fill(inputPrompt);
+            await page.waitForTimeout(500);
+
+            // ==========================================
+            // EVENT MONITORING SYSTEM ACTIVATION
+            // ==========================================
+            console.log("Hooking Event Monitors into browser network traffic matrix...");
+            const generationResponsePromise = page.waitForResponse(response => {
+              const contentType = response.headers()['content-type'] || '';
+              return (
+                response.status() === 200 && 
+                (contentType.includes('image/') || response.url().includes('/api/generate/status') || response.url().includes('status'))
+              );
+            }, { timeout: 180000 });
+
+            console.log("Firing Generation trigger...");
+            await page.getByRole('button', { name: 'Generate |' }).click();
+
+            console.log("Awaiting processing completion via network telemetry tracking...");
+            await generationResponsePromise;
+            console.log("Generation complete response intercepted!");
+
+            // ==========================================
+            // UI LAYER INTERACTION & DOWNLOAD
+            // ==========================================
+            const downloadButton = page.getByRole('button', { name: 'Download' });
+            console.log("Confirming element visibility on viewport...");
+            await downloadButton.waitFor({ state: 'visible', timeout: 45000 });
+
+            console.log("Arming file download interceptor...");
+            const downloadPromise = page.waitForEvent('download');
+            
+            console.log("Triggering final download loop...");
+            await downloadButton.click();
+            
+            const download = await downloadPromise;
+            const targetDestination = './output/' + download.suggestedFilename();
+            
+            await download.saveAs(targetDestination);
+            console.log(`Asset captured successfully and saved onto local storage: ${targetDestination}`);
+
+            await context.close();
+            await browser.close();
+          });
+          EOF
+
+          # Execute the newly written file inside a virtual frame display context
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npx playwright test inline_automation.test.js
+        env:
+          PROMPT_TEXT: ${{ inputs.prompt }}
+          IMAGE_FILE: ${{ inputs.image_name }}
+
+      - name: 5. Archive and Export Output File
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vheer-generated-output
+          path: output/
+          retention-days: 3
