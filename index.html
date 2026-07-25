@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vheer AI Generation Hub</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f3f4f6; color: #1f2937; max-width: 650px; margin: 40px auto; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        h1 { margin-top: 0; color: #111827; font-size: 26px; text-align: center; }
+        .form-group { margin-bottom: 22px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #374151; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 14px; transition: border 0.2s; }
+        input[type="text"]:focus, input[type="password"]:focus { outline: none; border-color: #2563eb; }
+        input[type="file"] { display: block; margin-top: 5px; }
+        button { width: 100%; background-color: #2563eb; color: white; border: none; padding: 14px; font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+        button:hover { background-color: #1d4ed8; }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        #status-box { margin-top: 20px; padding: 15px; border-radius: 8px; font-size: 14px; display: none; text-align: center; font-weight: 500; }
+        .success { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+        .error { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+        .info { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+        #result-container { display: none; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #e5e7eb; }
+        .download-btn { background-color: #10b981; }
+        .download-btn:hover { background-color: #059669; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>✨ Vheer AI Interactive Hub</h1>
+    <p style="text-align:center; color:#6b7280; font-size:14px; margin-bottom:25px;">Upload your source image, input your prompt, and retrieve your download right here.</p>
+    
+    <div class="form-group">
+        <label for="ghToken">GitHub Personal Access Token (Classic)</label>
+        <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+    </div>
+
+    <div class="form-group">
+        <label for="prompt">Transformation Prompt</label>
+        <input type="text" id="prompt" value="remove the jacket">
+    </div>
+
+    <div class="form-group">
+        <label for="imageFile">Source Image</label>
+        <input type="file" id="imageFile" accept="image/*">
+    </div>
+
+    <button id="submitBtn" onclick="startPipeline()">🚀 Process & Generate Image</button>
+    
+    <div id="status-box"></div>
+
+    <div id="result-container">
+        <h3>🎉 Generation Complete!</h3>
+        <p style="color:#4b5563; font-size:14px; margin-bottom:15px;">Your image package has been safely processed by the cloud execution runner.</p>
+        <button id="downloadBtn" class="download-btn">📥 Save Output Package (.zip)</button>
+    </div>
+</div>
+<script>
+    // --- CONFIGURE YOUR SPECIFIC DETAILS HERE ---
+    const REPO_OWNER = "YOUR_GITHUB_USERNAME"; 
+    const REPO_NAME = "YOUR_REPO_NAME";
+    const WORKFLOW_FILE = "vheer_runner.yml";
+
+    function updateStatus(text, type) {
+        const box = document.getElementById("status-box");
+        box.innerText = text;
+        box.className = type;
+        box.style.display = "block";
+    }
+
+    async function startPipeline() {
+        const token = document.getElementById("ghToken").value.trim();
+        const prompt = document.getElementById("prompt").value.trim();
+        const fileInput = document.getElementById("imageFile");
+        const btn = document.getElementById("submitBtn");
+        const resultContainer = document.getElementById("result-container");
+
+        if (!token) return updateStatus("❌ Please configure your GitHub Personal Access Token.", "error");
+        if (!prompt) return updateStatus("❌ Please input a valid text instruction prompt.", "error");
+        if (fileInput.files.length === 0) return updateStatus("❌ Please select a source image file.", "error");
+
+        btn.disabled = true;
+        resultContainer.style.display = "none";
+        updateStatus("Converting image matrix structure...", "info");
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = async () => {
+            try {
+                // Strip metadata prefix header to isolate raw Base64 payload data string
+                const base64Content = reader.result.split(',')[1];
+                const headers = {
+                    "Authorization": `token ${token}`,
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
+                };
+
+                updateStatus("Pushing target asset to repository branch tracker...", "info");
+                const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
+                
+                const checkRes = await fetch(uploadUrl, { headers });
+                let sha = null;
+                if (checkRes.status === 200) {
+                    const meta = await checkRes.json();
+                    sha = meta.sha;
+                }
+
+                const uploadBody = {
+                    message: "Web UI File Update Trigger",
+                    content: base64Content,
+                    branch: "main"
+                };
+                if (sha) uploadBody.sha = sha;
+
+                const putRes = await fetch(uploadUrl, { method: "PUT", headers, body: JSON.stringify(uploadBody) });
+                if (!putRes.ok) throw new Error("Could not stage input image to your repository framework.");
+
+                const triggerTime = new Date().toISOString();
+
+                updateStatus("Staging complete. Spinning up automated browser engines...", "info");
+                const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+                
+                const dispatchRes = await fetch(dispatchUrl, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({ ref: "main", inputs: { prompt: prompt } })
+                });
+
+                if (dispatchRes.status !== 204) throw new Error("Failed to dispatch workflow layer.");
+
+                pollWorkflowStatus(token, triggerTime);
+
+            } catch (error) {
+                updateStatus(`❌ Critical Execution Failure: ${error.message}`, "error");
+                btn.disabled = false;
+            }
+        };
+        
+        reader.readAsDataURL(file);
+    }
+
+    async function pollWorkflowStatus(token, triggerTime) {
+        const headers = { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" };
+        const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs?event=workflow_dispatch`;
+        
+        updateStatus("Monitoring cloud runner state... This takes about 1-2 minutes.", "info");
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(runsUrl, { headers });
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                const activeRun = data.workflow_runs.find(run => new Date(run.created_at) >= new Date(triggerTime));
+                
+                if (activeRun) {
+                    if (activeRun.status === "completed") {
+                        clearInterval(interval);
+                        if (activeRun.conclusion === "success") {
+                            updateStatus("Cloud generation resolved successfully! Fetching file binary...", "info");
+                            fetchGeneratedArtifact(token, activeRun.id);
+                        } else {
+                            updateStatus("❌ Cloud automation script failed. Review your GitHub Actions execution run logs.", "error");
+                            document.getElementById("submitBtn").disabled = false;
+                        }
+                    } else if (activeRun.status === "in_progress") {
+                        updateStatus("🔄 Vheer Platform is computing your request now... Browser processing active.", "info");
+                    }
+                }
+            } catch (err) {
+                console.error("Polling check failed", err);
+            }
+        }, 7000);
+    }
+
+    async function fetchGeneratedArtifact(token, runId) {
+        const headers = { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" };
+        const artifactUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/artifacts`;
+        
+        try {
+            const res = await fetch(artifactUrl, { headers });
+            const data = await res.json();
+            
+            if (!data.artifacts || data.artifacts.length === 0) {
+                throw new Error("No output assets found saved within build storage profiles.");
+            }
+
+            const targetArtifact = data.artifacts[0];
+            updateStatus("🎉 Completed! Download your package below.", "success");
+            
+            const zipDownloadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifact.id}/zip`;
+            const resultContainer = document.getElementById("result-container");
+            const downloadBtn = document.getElementById("downloadBtn");
+            
+            downloadBtn.onclick = async () => {
+                const fileFetch = await fetch(zipDownloadUrl, { headers });
+                const blob = await fileFetch.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = `${targetArtifact.name}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            };
+            
+            resultContainer.style.display = "block";
+            document.getElementById("submitBtn").disabled = false;
+
+        } catch (error) {
+            updateStatus(`❌ Artifact extraction fail: ${error.message}`, "error");
+            document.getElementById("submitBtn").disabled = false;
+        }
+    }
+</script>
+</body>
+</html>
