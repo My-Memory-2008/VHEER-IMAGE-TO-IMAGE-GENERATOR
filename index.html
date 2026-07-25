@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vheer AI Generation Hub</title>
+    <title>Vheer Tokenless AI Hub</title>
+    <!-- Include JSZip to automatically unzip the artifact directly in your browser -->
+    <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f3f4f6; color: #1f2937; max-width: 650px; margin: 40px auto; padding: 20px; }
         .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
         h1 { margin-top: 0; color: #111827; font-size: 26px; text-align: center; }
         .form-group { margin-bottom: 22px; }
         label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #374151; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 14px; transition: border 0.2s; }
-        input[type="text"]:focus, input[type="password"]:focus { outline: none; border-color: #2563eb; }
+        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 14px; transition: border 0.2s; }
+        input[type="text"]:focus { outline: none; border-color: #2563eb; }
         input[type="file"] { display: block; margin-top: 5px; }
         button { width: 100%; background-color: #2563eb; color: white; border: none; padding: 14px; font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
         button:hover { background-color: #1d4ed8; }
@@ -21,6 +23,7 @@
         .error { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
         .info { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
         #result-container { display: none; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #e5e7eb; }
+        #output-image { max-width: 100%; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #e5e7eb; }
         .download-btn { background-color: #10b981; }
         .download-btn:hover { background-color: #059669; }
     </style>
@@ -28,14 +31,9 @@
 <body>
 
 <div class="card">
-    <h1>✨ Vheer AI Interactive Hub</h1>
-    <p style="text-align:center; color:#6b7280; font-size:14px; margin-bottom:25px;">Upload your source image, input your prompt, and retrieve your download right here.</p>
+    <h1>✨ Vheer Zero-Token AI Studio</h1>
+    <p style="text-align:center; color:#6b7280; font-size:14px; margin-bottom:25px;">Upload your source image and write prompts securely without typing any access tokens.</p>
     
-    <div class="form-group">
-        <label for="ghToken">GitHub Personal Access Token (Classic)</label>
-        <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-    </div>
-
     <div class="form-group">
         <label for="prompt">Transformation Prompt</label>
         <input type="text" id="prompt" value="remove the jacket">
@@ -52,8 +50,8 @@
 
     <div id="result-container">
         <h3>🎉 Generation Complete!</h3>
-        <p style="color:#4b5563; font-size:14px; margin-bottom:15px;">Your image package has been safely processed by the cloud execution runner.</p>
-        <button id="downloadBtn" class="download-btn">📥 Save Output Package (.zip)</button>
+        <img id="output-image" src="" alt="Vheer AI Generated Output">
+        <button id="downloadBtn" class="download-btn">📥 Save Output Image (.png)</button>
     </div>
 </div>
 
@@ -62,7 +60,6 @@
     // --- CONFIGURE YOUR SPECIFIC DETAILS HERE ---
     const REPO_OWNER = "YOUR_GITHUB_USERNAME"; 
     const REPO_NAME = "YOUR_REPO_NAME";
-    const WORKFLOW_FILE = "vheer_runner.yml";
 
     function updateStatus(text, type) {
         const box = document.getElementById("status-box");
@@ -72,13 +69,11 @@
     }
 
     async function startPipeline() {
-        const token = document.getElementById("ghToken").value.trim();
         const prompt = document.getElementById("prompt").value.trim();
         const fileInput = document.getElementById("imageFile");
         const btn = document.getElementById("submitBtn");
         const resultContainer = document.getElementById("result-container");
 
-        if (!token) return updateStatus("❌ Please configure your GitHub Personal Access Token.", "error");
         if (!prompt) return updateStatus("❌ Please input a valid text instruction prompt.", "error");
         if (fileInput.files.length === 0) return updateStatus("❌ Please select a source image file.", "error");
 
@@ -91,48 +86,33 @@
         
         reader.onload = async () => {
             try {
-                // Strip metadata prefix header to isolate raw Base64 payload data string
+                // Isolate the base64 string chunk from the metadata header prefix
                 const base64Content = reader.result.split(',')[1];
-                const headers = {
-                    "Authorization": `token ${token}`,
-                    "Accept": "application/vnd.github.v3+json",
-                    "Content-Type": "application/json"
-                };
-
-                updateStatus("Pushing target asset to repository branch tracker...", "info");
-                const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
+                updateStatus("Sending secure trigger payload to GitHub cluster...", "info");
                 
-                const checkRes = await fetch(uploadUrl, { headers });
-                let sha = null;
-                if (checkRes.status === 200) {
-                    const meta = await checkRes.json();
-                    sha = meta.sha;
-                }
-
-                const uploadBody = {
-                    message: "Web UI File Update Trigger",
-                    content: base64Content,
-                    branch: "main"
+                const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/dispatches`;
+                const triggerPayload = {
+                    event_type: "web_ui_upload",
+                    client_payload: {
+                        prompt: prompt,
+                        image: base64Content
+                    }
                 };
-                if (sha) uploadBody.sha = sha;
-
-                const putRes = await fetch(uploadUrl, { method: "PUT", headers, body: JSON.stringify(uploadBody) });
-                if (!putRes.ok) throw new Error("Could not stage input image to your repository framework.");
-
+                
                 const triggerTime = new Date().toISOString();
 
-                updateStatus("Staging complete. Spinning up automated browser engines...", "info");
-                const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
-                
+                // Fire the public repository dispatch action hook
                 const dispatchRes = await fetch(dispatchUrl, {
                     method: "POST",
-                    headers,
-                    body: JSON.stringify({ ref: "main", inputs: { prompt: prompt } })
+                    headers: { "Accept": "application/vnd.github.v3+json" },
+                    body: JSON.stringify(triggerPayload)
                 });
 
-                if (dispatchRes.status !== 204) throw new Error("Failed to dispatch workflow layer.");
+                if (dispatchRes.status !== 204 && dispatchRes.status !== 200) {
+                    throw new Error("Unable to trigger pipeline. Ensure your repository settings are set to Public.");
+                }
 
-                pollWorkflowStatus(token, triggerTime);
+                pollWorkflowStatus(triggerTime);
 
             } catch (error) {
                 updateStatus(`❌ Critical Execution Failure: ${error.message}`, "error");
@@ -143,18 +123,17 @@
         reader.readAsDataURL(file);
     }
 
-    async function pollWorkflowStatus(token, triggerTime) {
-        const headers = { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" };
-        const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs?event=workflow_dispatch`;
-        
+    async function pollWorkflowStatus(triggerTime) {
+        const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs`;
         updateStatus("Monitoring cloud runner state... This takes about 1-2 minutes.", "info");
 
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(runsUrl, { headers });
+                const res = await fetch(runsUrl);
                 if (!res.ok) return;
                 const data = await res.json();
                 
+                // Track your specific dispatch action run matching execution window filters
                 const activeRun = data.workflow_runs.find(run => new Date(run.created_at) >= new Date(triggerTime));
                 
                 if (activeRun) {
@@ -162,7 +141,7 @@
                         clearInterval(interval);
                         if (activeRun.conclusion === "success") {
                             updateStatus("Cloud generation resolved successfully! Fetching file binary...", "info");
-                            fetchGeneratedArtifact(token, activeRun.id);
+                            fetchPublicArtifact(activeRun.id);
                         } else {
                             updateStatus("❌ Cloud automation script failed. Review your GitHub Actions execution run logs.", "error");
                             document.getElementById("submitBtn").disabled = false;
@@ -177,12 +156,11 @@
         }, 7000);
     }
 
-    async function fetchGeneratedArtifact(token, runId) {
-        const headers = { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" };
+    async function fetchPublicArtifact(runId) {
         const artifactUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/artifacts`;
         
         try {
-            const res = await fetch(artifactUrl, { headers });
+            const res = await fetch(artifactUrl);
             const data = await res.json();
             
             if (!data.artifacts || data.artifacts.length === 0) {
@@ -190,19 +168,31 @@
             }
 
             const targetArtifact = data.artifacts[0];
-            updateStatus("🎉 Completed! Download your package below.", "success");
-            
             const zipDownloadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifact.id}/zip`;
+            
+            const fileFetch = await fetch(zipDownloadUrl);
+            const blobData = await fileFetch.blob();
+            
+            const zip = await JSZip.loadAsync(blobData);
+            const imageFileKey = Object.keys(zip.files).find(name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg'));
+            
+            if (!imageFileKey) throw new Error("Could not find a valid output image file inside the package archive.");
+            
+            const unzippedBlob = await zip.files[imageFileKey].async("blob");
+            const finalImageSrcUrl = URL.createObjectURL(unzippedBlob);
+            
+            updateStatus("🎉 Generation Complete! View and save your image below.", "success");
+            
             const resultContainer = document.getElementById("result-container");
             const downloadBtn = document.getElementById("downloadBtn");
+            const outputImg = document.getElementById("output-image");
             
-            downloadBtn.onclick = async () => {
-                const fileFetch = await fetch(zipDownloadUrl, { headers });
-                const blob = await fileFetch.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
+            if (outputImg) outputImg.src = finalImageSrcUrl;
+            
+            downloadBtn.onclick = () => {
                 const a = document.createElement("a");
-                a.href = blobUrl;
-                a.download = `${targetArtifact.name}.zip`;
+                a.href = finalImageSrcUrl;
+                a.download = imageFileKey || "vheer_output.png";
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -217,5 +207,3 @@
         }
     }
 </script>
-</body>
-</html>
