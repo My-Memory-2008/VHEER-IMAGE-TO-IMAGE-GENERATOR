@@ -1,17 +1,14 @@
 import os
 import sys
-import time
 from playwright.sync_api import sync_playwright
 
 def run_automation():
-    # Fetch environment variables injected by GitHub Actions
     prompt_text = os.getenv("PROMPT_TEXT", "remove the jacket")
     image_file = os.getenv("DETECTED_IMAGE_FILE")
     auth_state_raw = os.getenv("VHEER_AUTH_STATE", "").strip()
     
     auth_state_path = "state.json"
     
-    # Materialize auth cookies if provided in repository secrets
     if auth_state_raw:
         print("Authentication state signature found! Injecting cookies...")
         with open(auth_state_path, "w", encoding="utf-8") as f:
@@ -22,11 +19,9 @@ def run_automation():
         sys.exit(1)
 
     with sync_playwright() as p:
-        print("Launching Chromium Instance with custom viewport profiles...")
-        # Headless must be False so xvfb can spoof a real physical graphics display interface
+        print("Launching Chromium Instance with custom profiles...")
         browser = p.chromium.launch(headless=False)
         
-        # Build browser context attaching the authentication state file layer
         has_state = os.path.exists(auth_state_path)
         context = browser.new_context(
             storage_state=auth_state_path if has_state else None,
@@ -35,15 +30,37 @@ def run_automation():
         )
         
         page = context.new_page()
+
+        # ========================================================
+        # ANTI-ADVERTISING & ROUTING LAYER
+        # ========================================================
+        print("Activating Network Ad-Blocking Filter...")
         
-        # Verbose Debugging: Log network endpoints directly to GitHub Actions console logs
-        page.on("request", lambda request: print(f">> [Requesting]: {request.url}"))
+        def block_trackers(route):
+            url = route.request.url.lower()
+            # Explicit blocklist patterns for trackers, pixels, ads, and sync engines
+            block_keywords = [
+                "temu", "opera", "amazon-adsystem", "ezoic", "google-analytics",
+                "doubleclick", "facebook.net", "pixel", "sync", "adx", "lijit",
+                "eskimi", "smaato", "rlcdn", "inmobi", "anyrtb", "rakuten", "onetag"
+            ]
+            
+            if any(keyword in url for keyword in block_keywords):
+                # Instantly drop the network frame at the socket layer
+                route.abort()
+            else:
+                route.continue_()
 
-        print("Navigating directly to exact Vheer App Workspace...")
-        page.goto("https://vheer.com/app/image-to-image", wait_until="networkidle")
-        page.wait_for_timeout(5000)
+        # Intercept all incoming global traffic patterns
+        page.route("**/*", block_trackers)
 
-        # Injecting the repository image file into the document object upload inputs
+        print("Navigating to Vheer App Workspace...")
+        page.goto("https://vheer.com/app/image-to-image", wait_until="commit")
+        
+        print("Waiting for page DOM container structures to become interactive...")
+        page.wait_for_selector("body", timeout=60000)
+        page.wait_for_timeout(3000)
+
         print(f"Injecting input repository image asset: {image_file}")
         file_input = page.locator('input[type="file"]')
         if file_input.count() > 0:
@@ -52,7 +69,6 @@ def run_automation():
             page.set_input_files('input[type="file"]', image_file)
         page.wait_for_timeout(3000)
 
-        # Handle the AI prompt instruction injection
         print(f"Filling generation prompt: '{prompt_text}'")
         prompt_box = page.locator('textarea, input[placeholder*="Describe"], [role="textbox"]')
         prompt_box.first.click()
@@ -64,7 +80,6 @@ def run_automation():
         # ========================================================
         print("Arming Network Stream Monitor for background generation completion...")
         
-        # Helper filter matching target application endpoints or raw image streams 
         def response_filter(response):
             url = response.url
             status = response.status
@@ -73,16 +88,14 @@ def run_automation():
                 "api" in url or "predict" in url or "vheer" in url or "image/" in content_type
             )
 
-        # Trigger generation trigger loop element
         print("Clicking Generate trigger button...")
-        page.locator('button:has-text("Generate")').first.click()
+        page.locator('button:has-text("Generate")').first().click()
         
-        # Halt process block sequentially until the specific response structure passes the filter criteria
         try:
             page.wait_for_response(response_filter, timeout=240000)
             print("Image generation network event intercepted successfully!")
         except Exception as e:
-            print(f"Warning: Network response tracking timed out or caught exception: {e}")
+            print(f"Warning: Network response tracking hit exception or resolved: {e}")
 
         # ========================================================
         # UI ELEMENT STABILISATION AND OS DOWNLOAD ENGINE
