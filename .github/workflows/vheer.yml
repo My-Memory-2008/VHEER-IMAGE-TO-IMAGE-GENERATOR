@@ -25,7 +25,7 @@ jobs:
           mkdir -p output
           npm init -y
           
-          # 1. Dynamically match 'input-image' regardless of extension (.jpg, .png, etc.)
+          # 1. Dynamically locate 'input-image' regardless of extension (.jpg, .png, etc.)
           echo "Locating the repository base file..."
           TARGET_FILE=$(find . -maxdepth 1 -iname "input-image*" -print -quit)
           
@@ -39,16 +39,17 @@ jobs:
           CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
           echo "Discovered file target: $CLEAN_FILE_NAME"
           
-          # 2. Setup stealth automation engine
-          npm install @playwright/test playwright playwright-extra automation-extra-plugin-stealth
+          # 2. Setup stealth automation engine with valid npm ecosystem packages
+          npm install @playwright/test playwright playwright-extra puppeteer-extra-plugin-stealth
           npx playwright install --with-deps chromium
           
-          # 3. Create monolithic execution script
+          # 3. Create monolithic execution script targeting correct sub-dashboard URL
           cat << 'EOF' > run_vheer.test.js
           const { test } = require('@playwright/test');
           const { chromium } = require('playwright-extra');
-          const stealth = require('automation-extra-plugin-stealth')();
+          const stealth = require('puppeteer-extra-plugin-stealth')();
 
+          // Apply stealth browser profiles to chromium instance
           chromium.use(stealth);
 
           test('Execute Image-to-Image Generation Loop', async () => {
@@ -59,11 +60,11 @@ jobs:
             });
             const page = await context.newPage();
 
-            console.log("Navigating to Vheer Workspace...");
-            await page.goto('https://vheer.com', { waitUntil: 'networkidle' });
+            console.log("Navigating to exact Vheer App Workspace...");
+            await page.goto('https://vheer.com/app/image-to-image', { waitUntil: 'networkidle' });
             await page.waitForTimeout(4000);
 
-            // Directly inject the matched image into the hidden file interface target
+            // Directly inject the matched image into the underlying file interface target
             console.log(`Uploading file asset: ${process.env.DETECTED_IMAGE_FILE}`);
             const fileInput = page.locator('input[type="file"]');
             if (await fileInput.count() > 0) {
@@ -90,13 +91,13 @@ jobs:
               );
             }, { timeout: 180000 });
 
-            // Click generate
+            // Click generate button element
             await page.locator('button:has-text("Generate")').first().click();
             
-            console.log("Awaiting background processing layers to resolve...");
+            console.log("Awaiting background processing layers to resolve graphics payloads...");
             await generationResponsePromise;
 
-            // Trigger and capture file system download event stream
+            // Trigger and capture file system download event stream safely
             const downloadButton = page.locator('button:has-text("Download"), [aria-label*="Download"]');
             await downloadButton.first().waitFor({ state: 'visible', timeout: 45000 });
             
@@ -112,7 +113,7 @@ jobs:
           });
           EOF
 
-          # 4. Trigger headless browser virtualization engine
+          # 4. Trigger headless browser virtualization frame buffer engine
           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npx playwright test run_vheer.test.js
         env:
           PROMPT_TEXT: ${{ inputs.prompt }}
