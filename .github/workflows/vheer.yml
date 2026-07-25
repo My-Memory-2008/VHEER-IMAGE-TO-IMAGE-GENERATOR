@@ -7,42 +7,43 @@ on:
         required: true
         default: 'remove the jacket'
         type: string
-      image_name:
-        description: 'The repo file name (e.g., input-image or input-image.jpg)'
-        required: true
-        default: 'input-image'
-        type: string
 
 jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code Tree
+        uses: actions/checkout@v4
+
+      - name: Setup Node Workspace Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Run Complete Vheer Pipeline
         run: |
-          # 1. Clone your repository code tree into the runner workspace
-          uses=actions/checkout@v4 
-          node_setup=actions/setup-node@v4
           mkdir -p output
           npm init -y
           
-          # 2. Check for the committed file matching 'input-image'
-          echo "Searching for target image file in repository..."
-          TARGET_FILE=$(find . -maxdepth 1 -name "${{ inputs.image_name }}*" -print -quit)
+          # 1. Dynamically match 'input-image' regardless of extension (.jpg, .png, etc.)
+          echo "Locating the repository base file..."
+          TARGET_FILE=$(find . -maxdepth 1 -iname "input-image*" -print -quit)
           
-          if [ -z "$TARGET_FILE" ]; then
-            echo "::error:: Could not find any repository file matching '${{ inputs.image_name }}'"
+          if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
+            echo "::error:: Could not find any root file starting with 'input-image'"
+            echo "Listing files in workspace root for debugging:"
+            ls -la
             exit 1
           fi
           
-          # Strip the leading './' to make it a clean filename string
           CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
-          echo "Found target repository file: $CLEAN_FILE_NAME"
+          echo "Discovered file target: $CLEAN_FILE_NAME"
           
-          # 3. Fetch Runtime and Automated Cloudflare-Bypass Dependencies
+          # 2. Setup stealth automation engine
           npm install @playwright/test playwright playwright-extra automation-extra-plugin-stealth
           npx playwright install --with-deps chromium
           
-          # 4. Create the Automation Test File
+          # 3. Create monolithic execution script
           cat << 'EOF' > run_vheer.test.js
           const { test } = require('@playwright/test');
           const { chromium } = require('playwright-extra');
@@ -59,11 +60,11 @@ jobs:
             const page = await context.newPage();
 
             console.log("Navigating to Vheer Workspace...");
-            await page.goto('https://vheer.com/app/image-to-image#google_vignette', { waitUntil: 'networkidle' });
+            await page.goto('https://vheer.com', { waitUntil: 'networkidle' });
             await page.waitForTimeout(4000);
 
-            // Inject the matching repository file found by the runner
-            console.log(`Locating upload targets for: ${process.env.DETECTED_IMAGE_FILE}`);
+            // Directly inject the matched image into the hidden file interface target
+            console.log(`Uploading file asset: ${process.env.DETECTED_IMAGE_FILE}`);
             const fileInput = page.locator('input[type="file"]');
             if (await fileInput.count() > 0) {
               await fileInput.setInputFiles(process.env.DETECTED_IMAGE_FILE);
@@ -72,14 +73,14 @@ jobs:
             }
             await page.waitForTimeout(2000);
 
-            // Populate AI transformation instructions
-            console.log("Submitting prompt query parameters...");
+            // Fill prompt parameters
+            console.log("Submitting prompt criteria...");
             const promptBox = page.locator('textarea, input[placeholder*="Describe"], [role="textbox"]');
             await promptBox.first().click();
             await promptBox.first().fill(process.env.PROMPT_TEXT);
             await page.waitForTimeout(1000);
 
-            // Configure event monitor to catch the generated asset response stream
+            // Hook the event traffic monitor to watch for backend creation callbacks
             console.log("Arming network event listener matrix...");
             const generationResponsePromise = page.waitForResponse(response => {
               const contentType = response.headers()['content-type'] || '';
@@ -92,10 +93,10 @@ jobs:
             // Click generate
             await page.locator('button:has-text("Generate")').first().click();
             
-            console.log("Awaiting background processing layer to resolve graphics assets...");
+            console.log("Awaiting background processing layers to resolve...");
             await generationResponsePromise;
 
-            // Handle UI layer interaction and download
+            // Trigger and capture file system download event stream
             const downloadButton = page.locator('button:has-text("Download"), [aria-label*="Download"]');
             await downloadButton.first().waitFor({ state: 'visible', timeout: 45000 });
             
@@ -103,16 +104,15 @@ jobs:
             await downloadButton.first().click();
             const download = await downloadPromise;
 
-            // Save inside output directory for GitHub workspace processing
             await download.saveAs('./output/' + download.suggestedFilename());
-            console.log("Image generation workflow successfully finished!");
+            console.log("Workflow successfully completed!");
 
             await context.close();
             await browser.close();
           });
           EOF
 
-          # 5. Fire execution within a Spoofed Virtual Display Frame Buffer
+          # 4. Trigger headless browser virtualization engine
           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npx playwright test run_vheer.test.js
         env:
           PROMPT_TEXT: ${{ inputs.prompt }}
