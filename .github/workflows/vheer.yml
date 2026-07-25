@@ -39,74 +39,119 @@ jobs:
           CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
           echo "Discovered file target: $CLEAN_FILE_NAME"
           
-          # 2. Setup stealth automation engine with valid npm ecosystem packages
+          # 2. Setup stealth automation engine
           npm install @playwright/test playwright playwright-extra puppeteer-extra-plugin-stealth
           npx playwright install --with-deps chromium
           
-          # 3. Create monolithic execution script targeting correct sub-dashboard URL
+          # 3. Create monolithic execution script targeting correct dashboard sub-url
           cat << 'EOF' > run_vheer.test.js
           const { test } = require('@playwright/test');
           const { chromium } = require('playwright-extra');
           const stealth = require('puppeteer-extra-plugin-stealth')();
+          const fs = require('fs');
 
-          // Apply stealth browser profiles to chromium instance
+          // Extend browser fingerprinter profiles with stealth evasion techniques
           chromium.use(stealth);
 
+          // Set test timeout configuration to infinite (0) to allow total event-driven execution
+          test.setTimeout(0);
+
           test('Execute Image-to-Image Generation Loop', async () => {
+            const authStatePath = 'state.json';
+            
+            // Re-materialise authentication tokens/cookies if secret data payload is supplied
+            if (process.env.VHEER_AUTH_STATE && process.env.VHEER_AUTH_STATE.trim() !== "") {
+              console.log("Valid secret footprint found! Writing injection state file...");
+              fs.writeFileSync(authStatePath, process.env.VHEER_AUTH_STATE);
+            } else {
+              console.log("Warning: No VHEER_AUTH_STATE secret provided. Running clean context session.");
+            }
+
             const browser = await chromium.launch({ headless: false });
+            
+            // Build out browser context session embedding the token file layer
             const context = await browser.newContext({
+              storageState: fs.existsSync(authStatePath) ? authStatePath : undefined,
               viewport: { width: 1280, height: 720 },
               userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
             });
+            
             const page = await context.newPage();
 
-            console.log("Navigating to exact Vheer App Workspace...");
+            console.log("Navigating directly to exact Vheer App Dashboard...");
             await page.goto('https://vheer.com/app/image-to-image', { waitUntil: 'networkidle' });
-            await page.waitForTimeout(4000);
+            await page.waitForTimeout(5000);
 
             // Directly inject the matched image into the underlying file interface target
-            console.log(`Uploading file asset: ${process.env.DETECTED_IMAGE_FILE}`);
+            console.log(`Uploading file asset target: ${process.env.DETECTED_IMAGE_FILE}`);
             const fileInput = page.locator('input[type="file"]');
             if (await fileInput.count() > 0) {
               await fileInput.setInputFiles(process.env.DETECTED_IMAGE_FILE);
             } else {
               await page.setInputFiles('input[type="file"]', process.env.DETECTED_IMAGE_FILE);
             }
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(3000);
 
             // Fill prompt parameters
-            console.log("Submitting prompt criteria...");
+            console.log("Submitting prompt criteria details...");
             const promptBox = page.locator('textarea, input[placeholder*="Describe"], [role="textbox"]');
             await promptBox.first().click();
             await promptBox.first().fill(process.env.PROMPT_TEXT);
-            await page.waitForTimeout(1000);
+            await page.waitForTimeout(1500);
 
-            // Hook the event traffic monitor to watch for backend creation callbacks
-            console.log("Arming network event listener matrix...");
-            const generationResponsePromise = page.waitForResponse(response => {
-              const contentType = response.headers()['content-type'] || '';
-              return (
-                response.status() === 200 && 
-                (contentType.includes('image/') || response.url().includes('generate') || response.url().includes('status'))
-              );
-            }, { timeout: 180000 });
+            // ========================================================
+            // EVENT MONITORING SYSTEM ACTIVATION (NETWORK & DOWNLOADS)
+            // ========================================================
+            console.log("Initializing Event Monitoring Matrix...");
+            
+            // Promise tracking the network response event for generation completeness
+            const generationCompletedEvent = new Promise((resolve) => {
+              page.on('response', (response) => {
+                const contentType = response.headers()['content-type'] || '';
+                const url = response.url();
+                
+                // Event condition passes when an image payload or a completed status endpoint resolves with an HTTP 200
+                if (response.status() === 200 && (contentType.includes('image/') || url.includes('generate') || url.includes('status') || url.includes('predict'))) {
+                  console.log(`[Event Intercepted] Network completed stream detected: ${url}`);
+                  resolve(true);
+                }
+              });
+            });
 
-            // Click generate button element
+            // Promise tracking system level download requests triggered by the browser loop
+            const fileDownloadedEvent = new Promise((resolve) => {
+              page.on('download', async (download) => {
+                const savePath = './output/' + download.suggestedFilename();
+                await download.saveAs(savePath);
+                console.log(`[Event Intercepted] System-level download capture fired! Saved to: ${savePath}`);
+                resolve(true);
+              });
+            });
+
+            // Click generate button element to kick off generation lifecycle
+            console.log("Firing generation workflow trigger button...");
             await page.locator('button:has-text("Generate")').first().click();
             
-            console.log("Awaiting background processing layers to resolve graphics payloads...");
-            await generationResponsePromise;
+            console.log("Awaiting processing completion via network stream event interceptors...");
+            await generationCompletedEvent;
+            console.log("Generation network state event verified!");
 
-            // Trigger and capture file system download event stream safely
+            // Trigger download sequence loop 
+            console.log("Locating the UI download trigger element...");
             const downloadButton = page.locator('button:has-text("Download"), [aria-label*="Download"]');
-            await downloadButton.first().waitFor({ state: 'visible', timeout: 45000 });
             
-            const downloadPromise = page.waitForEvent('download');
+            // Keep looping the action until the UI reveals the download trigger button
+            while (!(await downloadButton.first().isVisible())) {
+              console.log("Download button not ready yet in UI frame. Re-checking layout tree...");
+              await page.waitForTimeout(2000);
+            }
+            
+            console.log("Download trigger button is visible. Executing click tracking loop...");
             await downloadButton.first().click();
-            const download = await downloadPromise;
-
-            await download.saveAs('./output/' + download.suggestedFilename());
-            console.log("Workflow successfully completed!");
+            
+            console.log("Awaiting final disk write conformation via OS-level download event listeners...");
+            await fileDownloadedEvent;
+            console.log("All pipeline events successfully fulfilled!");
 
             await context.close();
             await browser.close();
@@ -118,6 +163,7 @@ jobs:
         env:
           PROMPT_TEXT: ${{ inputs.prompt }}
           DETECTED_IMAGE_FILE: $CLEAN_FILE_NAME
+          VHEER_AUTH_STATE: ${{ secrets.VHEER_AUTH_STATE }}
 
       - name: Export Generated Output Graphic
         uses: actions/upload-artifact@v4
