@@ -69,141 +69,150 @@
     }
 
     async function startPipeline() {
-        const prompt = document.getElementById("prompt").value.trim();
-        const fileInput = document.getElementById("imageFile");
-        const btn = document.getElementById("submitBtn");
-        const resultContainer = document.getElementById("result-container");
-
-        if (!prompt) return updateStatus("❌ Please input a valid text instruction prompt.", "error");
-        if (fileInput.files.length === 0) return updateStatus("❌ Please select a source image file.", "error");
-
-        btn.disabled = true;
-        resultContainer.style.display = "none";
-        updateStatus("Converting image matrix structure...", "info");
-
-        const file = fileInput.files[0];
-        const reader = new FileReader();
-        
-        reader.onload = async () => {
-            try {
-                // Isolate the base64 string chunk from the metadata header prefix
-                const base64Content = reader.result.split(',')[1];
-                updateStatus("Sending secure trigger payload to GitHub cluster...", "info");
-                
-                const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/dispatches`;
-                const triggerPayload = {
-                    event_type: "web_ui_upload",
-                    client_payload: {
-                        prompt: prompt,
-                        image: base64Content
-                    }
-                };
-                
-                const triggerTime = new Date().toISOString();
-
-                // Fire the public repository dispatch action hook
-                const dispatchRes = await fetch(dispatchUrl, {
-                    method: "POST",
-                    headers: { "Accept": "application/vnd.github.v3+json" },
-                    body: JSON.stringify(triggerPayload)
-                });
-
-                if (dispatchRes.status !== 204 && dispatchRes.status !== 200) {
-                    throw new Error("Unable to trigger pipeline. Ensure your repository settings are set to Public.");
-                }
-
-                pollWorkflowStatus(triggerTime);
-
-            } catch (error) {
-                updateStatus(`❌ Critical Execution Failure: ${error.message}`, "error");
-                btn.disabled = false;
-            }
-        };
-        
-        reader.readAsDataURL(file);
+    const prompt = document.getElementById("prompt").value.trim();
+    const fileInput = document.getElementById("imageFile");
+    const btn = document.getElementById("submitBtn");
+    
+    // Proactively read token from browser session memory configuration to ensure network clearance
+    let token = localStorage.getItem("VHEER_SECRET_KEY");
+    if (!token) {
+        token = prompt("🔒 Please provide your GitHub Personal Access Token (Classic) once to establish connection securely:");
+        if (token) localStorage.setItem("VHEER_SECRET_KEY", token.trim());
     }
 
-    async function pollWorkflowStatus(triggerTime) {
-        const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs`;
-        updateStatus("Monitoring cloud runner state... This takes about 1-2 minutes.", "info");
+    if (!token) return updateStatus("❌ Connection aborted. GitHub authorization token required.", "error");
+    if (!prompt) return updateStatus("❌ Please input a valid text instruction prompt.", "error");
+    if (fileInput.files.length === 0) return updateStatus("❌ Please select a source image file.", "error");
 
-        const interval = setInterval(async () => {
-            try {
-                const res = await fetch(runsUrl);
-                if (!res.ok) return;
-                const data = await res.json();
-                
-                // Track your specific dispatch action run matching execution window filters
-                const activeRun = data.workflow_runs.find(run => new Date(run.created_at) >= new Date(triggerTime));
-                
-                if (activeRun) {
-                    if (activeRun.status === "completed") {
-                        clearInterval(interval);
-                        if (activeRun.conclusion === "success") {
-                            updateStatus("Cloud generation resolved successfully! Fetching file binary...", "info");
-                            fetchPublicArtifact(activeRun.id);
-                        } else {
-                            updateStatus("❌ Cloud automation script failed. Review your GitHub Actions execution run logs.", "error");
-                            document.getElementById("submitBtn").disabled = false;
-                        }
-                    } else if (activeRun.status === "in_progress") {
-                        updateStatus("🔄 Vheer Platform is computing your request now... Browser processing active.", "info");
-                    }
-                }
-            } catch (err) {
-                console.error("Polling check failed", err);
-            }
-        }, 7000);
-    }
+    btn.disabled = true;
+    updateStatus("Converting image matrix structure...", "info");
 
-    async function fetchPublicArtifact(runId) {
-        const artifactUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/artifacts`;
-        
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = async () => {
         try {
-            const res = await fetch(artifactUrl);
-            const data = await res.json();
+            // Split out base64 chunk string
+            const base64Content = reader.result.split(',')[1];
+            updateStatus("Authorizing pipeline with GitHub servers...", "info");
             
-            if (!data.artifacts || data.artifacts.length === 0) {
-                throw new Error("No output assets found saved within build storage profiles.");
-            }
-
-            const targetArtifact = data.artifacts[0];
-            const zipDownloadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifact.id}/zip`;
-            
-            const fileFetch = await fetch(zipDownloadUrl);
-            const blobData = await fileFetch.blob();
-            
-            const zip = await JSZip.loadAsync(blobData);
-            const imageFileKey = Object.keys(zip.files).find(name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg'));
-            
-            if (!imageFileKey) throw new Error("Could not find a valid output image file inside the package archive.");
-            
-            const unzippedBlob = await zip.files[imageFileKey].async("blob");
-            const finalImageSrcUrl = URL.createObjectURL(unzippedBlob);
-            
-            updateStatus("🎉 Generation Complete! View and save your image below.", "success");
-            
-            const resultContainer = document.getElementById("result-container");
-            const downloadBtn = document.getElementById("downloadBtn");
-            const outputImg = document.getElementById("output-image");
-            
-            if (outputImg) outputImg.src = finalImageSrcUrl;
-            
-            downloadBtn.onclick = () => {
-                const a = document.createElement("a");
-                a.href = finalImageSrcUrl;
-                a.download = imageFileKey || "vheer_output.png";
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+            const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/dispatches`;
+            const triggerPayload = {
+                event_type: "web_ui_upload",
+                client_payload: { prompt: prompt, image: base64Content }
             };
             
-            resultContainer.style.display = "block";
-            document.getElementById("submitBtn").disabled = false;
+            const triggerTime = new Date().toISOString();
+
+            // Injecting the token into authorization headers fixes the 'Failed to fetch' blockage
+            const dispatchRes = await fetch(dispatchUrl, {
+                method: "POST",
+                headers: { 
+                    "Authorization": `token ${token}`,
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(triggerPayload)
+            });
+
+            if (dispatchRes.status !== 204 && dispatchRes.status !== 200) {
+                const errBody = await dispatchRes.text();
+                throw new Error(`Server rejected authorization: ${errBody}`);
+            }
+
+            pollWorkflowStatus(triggerTime);
 
         } catch (error) {
-            updateStatus(`❌ Artifact extraction fail: ${error.message}`, "error");
-            document.getElementById("submitBtn").disabled = false;
+            updateStatus(`❌ Critical Execution Failure: ${error.message}`, "error");
+            btn.disabled = false;
         }
+    };
+    reader.readAsDataURL(file);
+}
+
+    async function pollWorkflowStatus(triggerTime) {
+    const token = localStorage.getItem("VHEER_SECRET_KEY");
+    const headers = { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" };
+    const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs`;
+    
+    updateStatus("Connection verified! Monitoring cloud runner state...", "info");
+
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch(runsUrl, { headers });
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            const activeRun = data.workflow_runs.find(run => new Date(run.created_at) >= new Date(triggerTime));
+            
+            if (activeRun) {
+                if (activeRun.status === "completed") {
+                    clearInterval(interval);
+                    if (activeRun.conclusion === "success") {
+                        updateStatus("Cloud generation resolved successfully! Fetching file binary...", "info");
+                        fetchPublicArtifact(activeRun.id);
+                    } else {
+                        updateStatus("❌ Cloud automation script failed. Review your GitHub Actions execution run logs.", "error");
+                        document.getElementById("submitBtn").disabled = false;
+                    }
+                } else if (activeRun.status === "in_progress") {
+                    updateStatus("🔄 Vheer Platform is computing your request now... Browser processing active.", "info");
+                }
+            }
+        } catch (err) {
+            console.error("Polling check failed", err);
+        }
+    }, 7000);
+}
+
+async function fetchPublicArtifact(runId) {
+    const token = localStorage.getItem("VHEER_SECRET_KEY");
+    const headers = { "Authorization": `token ${token}` };
+    const artifactUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/artifacts`;
+    
+    try {
+        const res = await fetch(artifactUrl, { headers: { ...headers, "Accept": "application/vnd.github.v3+json" } });
+        const data = await res.json();
+        
+        if (!data.artifacts || data.artifacts.length === 0) throw new Error("No output assets found.");
+
+        const targetArtifact = data.artifacts[0];
+        const zipDownloadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifact.id}/zip`;
+        
+        const fileFetch = await fetch(zipDownloadUrl, { headers });
+        const blobData = await fileFetch.blob();
+        
+        const zip = await JSZip.loadAsync(blobData);
+        const imageFileKey = Object.keys(zip.files).find(name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg'));
+        
+        if (!imageFileKey) throw new Error("Could not find a valid output image file inside the package archive.");
+        
+        const unzippedBlob = await zip.files[imageFileKey].async("blob");
+        const finalImageSrcUrl = URL.createObjectURL(unzippedBlob);
+        
+        updateStatus("🎉 Generation Complete! View and save your image below.", "success");
+        
+        const resultContainer = document.getElementById("result-container");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const outputImg = document.getElementById("output-image");
+        
+        if (outputImg) outputImg.src = finalImageSrcUrl;
+        
+        downloadBtn.onclick = () => {
+            const a = document.createElement("a");
+            a.href = finalImageSrcUrl;
+            a.download = imageFileKey || "vheer_output.png";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        };
+        
+        resultContainer.style.display = "block";
+        document.getElementById("submitBtn").disabled = false;
+
+    } catch (error) {
+        updateStatus(`❌ Artifact extraction fail: ${error.message}`, "error");
+        document.getElementById("submitBtn").disabled = false;
     }
+}
 </script>
