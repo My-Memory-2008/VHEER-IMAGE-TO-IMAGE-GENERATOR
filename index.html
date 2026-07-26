@@ -186,6 +186,35 @@
             display: none;
         }
 
+        .preview-container {
+            display: none;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+        }
+
+        .preview-container.show {
+            display: block;
+        }
+
+        .preview-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
         .button-group {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -409,6 +438,12 @@
                 <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
             </div>
 
+            <!-- Image Preview Container -->
+            <div class="preview-container" id="previewContainer">
+                <div class="preview-label">📸 Selected Image</div>
+                <img id="previewImage" class="preview-image" src="" alt="Preview">
+            </div>
+
             <div id="fileName" class="file-selected" style="display: none;">
                 ✓ <span id="fileNameText"></span>
             </div>
@@ -458,6 +493,7 @@
 
         let uploadedImage = null;
         let currentResultUrl = null;
+        let uploadedImageDataUrl = null;
 
         // ============================================================================
         // Form Validation
@@ -527,9 +563,17 @@
 
             const reader = new FileReader();
             reader.onload = (e) => {
-                uploadedImage = e.target.result.split(',')[1];
+                uploadedImageDataUrl = e.target.result; // Full data URL with header
+                uploadedImage = e.target.result.split(',')[1]; // Base64 only
+                
+                // Show preview
+                document.getElementById("previewImage").src = uploadedImageDataUrl;
+                document.getElementById("previewContainer").classList.add("show");
+                
+                // Show filename
                 document.getElementById("fileName").style.display = "block";
                 document.getElementById("fileNameText").textContent = file.name;
+                
                 console.log("Image loaded, triggering form check");
                 checkFormReady();
             };
@@ -759,7 +803,9 @@
             document.getElementById("promptInput").value = "";
             document.getElementById("fileInput").value = "";
             document.getElementById("fileName").style.display = "none";
+            document.getElementById("previewContainer").classList.remove("show");
             uploadedImage = null;
+            uploadedImageDataUrl = null;
             checkFormReady();
             clearError();
         }
