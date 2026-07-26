@@ -58,7 +58,8 @@
         <button id="downloadBtn" class="download-btn">📥 Save Output Image (.png)</button>
     </div>
 </div>
-<script>
+
+    <script>
     // --- CONFIGURE YOUR SPECIFIC DETAILS HERE ---
     const REPO_OWNER = "YOUR_GITHUB_USERNAME"; 
     const REPO_NAME = "YOUR_REPO_NAME";
@@ -99,12 +100,13 @@
         resultContainer.style.display = "none";
         updateStatus("Encoding image data segments into base64 block structures...", "info");
 
-        const file = fileInput.files[0];
+        // FIXED: Extract the single specific file node object from the FileList collection array
+        const targetedFileBlob = fileInput.files[0];
         const reader = new FileReader();
         
         reader.onload = async () => {
             try {
-                // FIXED: Explicitly target array index [1] to isolate pure string payload content data
+                // FIXED: Pull index [1] to isolate the clean base64 data stream block text segment cleanly
                 const base64Content = reader.result.split(',')[1];
                 
                 updateStatus("Authorizing and handshaking with GitHub Cloud API servers...", "info");
@@ -156,7 +158,8 @@
             }
         };
         
-        reader.readAsDataURL(file);
+        // Pass the actual raw file node to avoid internal script crashing
+        reader.readAsDataURL(targetedFileBlob);
     }
 
     async function pollWorkflowStatus(triggerTime) {
@@ -207,7 +210,7 @@
                 throw new Error("No output assets found saved within build storage profiles.");
             }
 
-            const targetArtifact = data.artifacts;
+            const targetArtifact = data.artifacts[0];
             const zipDownloadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifact.id}/zip`;
             
             const fileFetch = await fetch(zipDownloadUrl, { headers });
