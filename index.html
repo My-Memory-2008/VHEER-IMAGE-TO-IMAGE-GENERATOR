@@ -142,7 +142,7 @@
 
         textarea {
             resize: vertical;
-            min-height: 60px;
+            min-height: 80px;
         }
 
         .upload-zone {
@@ -352,6 +352,12 @@
             font-size: 13px;
         }
 
+        .file-selected {
+            color: var(--success);
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 12px;
@@ -403,7 +409,7 @@
 
             <div class="form-group">
                 <label for="promptInput">Transformation Prompt</label>
-                <textarea id="promptInput" placeholder="e.g., Remove the jacket, Change to summer style..."></textarea>
+                <textarea id="promptInput" placeholder="e.g., Remove the jacket, Change to summer style..." oninput="checkFormReady()"></textarea>
             </div>
 
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
@@ -413,7 +419,7 @@
                 <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
             </div>
 
-            <div id="fileName" style="color: var(--success); font-size: 13px; margin-bottom: 15px; display: none;">
+            <div id="fileName" class="file-selected" style="display: none;">
                 ✓ <span id="fileNameText"></span>
             </div>
 
@@ -462,6 +468,15 @@
 
         let uploadedImage = null;
         let currentResultUrl = null;
+
+        // ============================================================================
+        // Form Validation
+        // ============================================================================
+        function checkFormReady() {
+            const hasImage = uploadedImage !== null;
+            const hasPrompt = document.getElementById("promptInput").value.trim().length > 0;
+            document.getElementById("generateBtn").disabled = !(hasImage && hasPrompt);
+        }
 
         // ============================================================================
         // Token Management
@@ -523,7 +538,7 @@
                 uploadedImage = e.target.result.split(',')[1];
                 document.getElementById("fileName").style.display = "block";
                 document.getElementById("fileNameText").textContent = file.name;
-                document.getElementById("generateBtn").disabled = false;
+                checkFormReady();
             };
             reader.readAsDataURL(file);
         }
@@ -745,8 +760,8 @@
             document.getElementById("promptInput").value = "";
             document.getElementById("fileInput").value = "";
             document.getElementById("fileName").style.display = "none";
-            document.getElementById("generateBtn").disabled = true;
             uploadedImage = null;
+            checkFormReady();
             clearError();
         }
 
