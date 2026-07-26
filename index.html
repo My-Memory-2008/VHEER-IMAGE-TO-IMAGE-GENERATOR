@@ -219,6 +219,7 @@ async function fetchPublicArtifact(runId) {
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -279,7 +280,8 @@ async function fetchPublicArtifact(runId) {
         <button id="downloadBtn" class="download-btn">📥 Save Output Image (.png)</button>
     </div>
 </div>
-<script>
+
+    <script>
     // --- CONFIGURE YOUR SPECIFIC DETAILS HERE ---
     const REPO_OWNER = "YOUR_GITHUB_USERNAME"; 
     const REPO_NAME = "YOUR_REPO_NAME";
@@ -325,12 +327,11 @@ async function fetchPublicArtifact(runId) {
         
         reader.onload = async () => {
             try {
-                // FIXED: Explicitly grab array index [1] to isolate pure Base64 content data
+                // FIXED: Explicitly target array index [1] to isolate pure string payload content data
                 const base64Content = reader.result.split(',')[1];
                 
                 updateStatus("Authorizing and handshaking with GitHub Cloud API servers...", "info");
                 
-                // FIXED: Changed breaking curly brace syntax typo to correct Javascript backtick literals string mapping
                 const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
                 const headers = { 
                     "Authorization": `token ${token}`,
@@ -358,7 +359,6 @@ async function fetchPublicArtifact(runId) {
                 const triggerTime = new Date().toISOString();
                 updateStatus("Staging complete. Spinning up automated browser engines...", "info");
 
-                // FIXED: Point to the workflow execution dispatch endpoint and pass payload parameters smoothly
                 const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
                 const dispatchRes = await fetch(dispatchUrl, {
                     method: "POST",
@@ -430,7 +430,7 @@ async function fetchPublicArtifact(runId) {
                 throw new Error("No output assets found saved within build storage profiles.");
             }
 
-            const targetArtifact = data.artifacts[0];
+            const targetArtifact = data.artifacts;
             const zipDownloadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifact.id}/zip`;
             
             const fileFetch = await fetch(zipDownloadUrl, { headers });
