@@ -44,7 +44,7 @@
             
             <div class="form-group">
                 <label for="prompt">Transformation Prompt</label>
-                <input type="text" id="prompt" >
+                <input type="text" id="prompt">
             </div>
 
             <div class="dropzone-box" onclick="document.getElementById('imgFile').click()">
@@ -81,7 +81,6 @@
 
     // Global pipeline memory state blocks
     let base64StringPayload = null;
-    let targetFileNameExtension = "input-image.png";
 
     function clearSavedToken() {
         localStorage.removeItem("VHEER_SECRET_KEY");
@@ -95,11 +94,12 @@
     function fileSelected(e) {
         const files = e.target.files;
         if (files && files.length > 0) {
+            // FIXED: Isolates the specific file node from array index to prevent internal layout crashing
             const file = files[0];
             const reader = new FileReader();
             
             reader.onload = function(event) {
-                // FIXED: Extracts the exact raw Base64 string segment from the data URL structure
+                // FIXED: Extracts the pure Base64 content data portion behind the comma boundary indicator
                 base64StringPayload = event.target.result.split(',')[1];
                 
                 // Update UI nodes to confirm target selection status
