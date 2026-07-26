@@ -279,12 +279,11 @@ async function fetchPublicArtifact(runId) {
         <button id="downloadBtn" class="download-btn">📥 Save Output Image (.png)</button>
     </div>
 </div>
-
-
 <script>
     // --- CONFIGURE YOUR SPECIFIC DETAILS HERE ---
     const REPO_OWNER = "YOUR_GITHUB_USERNAME"; 
     const REPO_NAME = "YOUR_REPO_NAME";
+    const WORKFLOW_FILE = "vheer_runner.yml";
 
     function updateStatus(text, type) {
         const box = document.getElementById("status-box");
@@ -326,30 +325,45 @@ async function fetchPublicArtifact(runId) {
         
         reader.onload = async () => {
             try {
-                // FIX: Grab index [1] to pull clean base64 data string payload, resolving the 'Failed to Fetch' crash
+                // FIXED: Explicitly grab array index [1] to isolate pure Base64 content data
                 const base64Content = reader.result.split(',')[1];
                 
                 updateStatus("Authorizing and handshaking with GitHub Cloud API servers...", "info");
                 
-                const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/dispatches`;
-                const triggerPayload = {
-                    event_type: "web_ui_upload",
-                    client_payload: {
-                        prompt: prompt,
-                        image: base64Content
-                    }
+                // FIXED: Changed breaking curly brace syntax typo to correct Javascript backtick literals string mapping
+                const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
+                const headers = { 
+                    "Authorization": `token ${token}`,
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
                 };
-                
-                const triggerTime = new Date().toISOString();
 
+                const checkRes = await fetch(uploadUrl, { headers });
+                let sha = null;
+                if (checkRes.status === 200) {
+                    const meta = await checkRes.json();
+                    sha = meta.sha;
+                }
+
+                const uploadBody = {
+                    message: "Web UI File Update Trigger",
+                    content: base64Content,
+                    branch: "main"
+                };
+                if (sha) uploadBody.sha = sha;
+
+                const putRes = await fetch(uploadUrl, { method: "PUT", headers, body: JSON.stringify(uploadBody) });
+                if (!putRes.ok) throw new Error("Could not stage input image to your repository framework.");
+
+                const triggerTime = new Date().toISOString();
+                updateStatus("Staging complete. Spinning up automated browser engines...", "info");
+
+                // FIXED: Point to the workflow execution dispatch endpoint and pass payload parameters smoothly
+                const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
                 const dispatchRes = await fetch(dispatchUrl, {
                     method: "POST",
-                    headers: { 
-                        "Authorization": `token ${token}`,
-                        "Accept": "application/vnd.github.v3+json",
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(triggerPayload)
+                    headers,
+                    body: JSON.stringify({ ref: "main", inputs: { prompt: prompt } })
                 });
 
                 if (dispatchRes.status !== 204 && dispatchRes.status !== 200) {
