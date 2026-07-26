@@ -7,57 +7,71 @@
     <!-- Include JSZip to automatically unzip the artifact directly in your browser -->
     <script src="https://cloudflare.com"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f3f4f6; color: #1f2937; max-width: 650px; margin: 40px auto; padding: 20px; }
-        .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
-        h1 { margin-top: 0; color: #111827; font-size: 26px; text-align: center; }
-        .form-group { margin-bottom: 22px; }
-        label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #374151; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 14px; transition: border 0.2s; }
-        input[type="text"]:focus, input[type="password"]:focus { outline: none; border-color: #2563eb; }
-        input[type="file"] { display: block; margin-top: 5px; }
-        button { width: 100%; background-color: #2563eb; color: white; border: none; padding: 14px; font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
-        button:hover { background-color: #1d4ed8; }
-        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
-        #status-box { margin-top: 20px; padding: 15px; border-radius: 8px; font-size: 14px; display: none; text-align: center; font-weight: 500; }
-        .success { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
-        .error { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
-        .info { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-        #result-container { display: none; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #e5e7eb; }
-        #output-image { max-width: 100%; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #e5e7eb; display: block; margin-left: auto; margin-right: auto; }
-        .download-btn { background-color: #10b981; }
-        .download-btn:hover { background-color: #059669; }
-        .clear-btn { background-color: #ef4444; margin-top: 5px; font-size: 12px; padding: 6px; width: auto; display: block; float: right; }
-        .clear-btn:hover { background-color: #dc2626; }
+        :root { --bg: #0f172a; --panel: #1e293b; --accent: #2563eb; --text: #f8fafc; --success: #10b981; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); color: var(--text); max-width: 650px; margin: 40px auto; padding: 20px; }
+        .navbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #334155; }
+        .logo { font-weight: bold; font-size: 20px; color: var(--success); }
+        .status-pill { background: #14532d; color: #4ade80; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .card-panel { background: var(--panel); padding: 30px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #94a3b8; }
+        input[type="text"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; box-sizing: border-box; font-size: 14px; color: white; }
+        input[type="text"]:focus { outline: none; border-color: var(--accent); }
+        .dropzone-box { border: 2px dashed #334155; padding: 30px; text-align: center; border-radius: 12px; cursor: pointer; background: #1e293b; transition: background 0.2s; margin-bottom: 20px; }
+        .dropzone-box:hover { background: #1e293b90; border-color: var(--accent); }
+        .btn-action { width: 100%; background-color: var(--accent); color: white; border: none; padding: 14px; font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+        .btn-action:hover { background-color: #1d4ed8; }
+        .btn-action:disabled { background-color: #475569; color: #94a3b8; cursor: not-allowed; }
+        .progress-track { background: #0f172a; border-radius: 20px; height: 10px; width: 100%; margin-top: 20px; overflow: hidden; border: 1px solid #334155; }
+        .progress-fill { background: var(--success); height: 100%; width: 0%; transition: width 0.4s ease; }
+        #finalImg { max-width: 100%; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; border: 1px solid #334155; display: block; margin-left: auto; margin-right: auto; }
+        .clear-btn { background: #ef4444; padding: 6px 12px; font-size: 12px; border-radius: 6px; cursor: pointer; color: white; border: none; float: right; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <button class="clear-btn" onclick="clearSavedToken()">Clear Saved Token</button>
-    <div style="clear: both;"></div>
-    <h1>✨ Vheer AI Interactive Hub</h1>
-    <p style="text-align:center; color:#6b7280; font-size:14px; margin-bottom:25px;">Upload your source image, input your prompt, and retrieve your download right here.</p>
-    
-    <div class="form-group">
-        <label for="prompt">Transformation Prompt</label>
-        <input type="text" id="prompt" value="remove the jacket">
+    <div class="navbar">
+        <div class="logo">Vheer AI Studio</div>
+        <div class="status-pill">Cloud Network: Connected</div>
     </div>
 
-    <div class="form-group">
-        <label for="imageFile">Source Image</label>
-        <input type="file" id="imageFile" accept="image/*">
-    </div>
+    <div class="workspace">
+        <!-- PANEL A: INPUT & SELECTION WORKSPACE -->
+        <div class="card-panel" id="mainWorkspace">
+            <button class="clear-btn" onclick="clearSavedToken()">Clear Secret Key</button>
+            <h2 style="margin: 0 0 5px 0; font-size: 22px;">Image-to-Image Generation</h2>
+            <p style="color: #94a3b8; font-size: 14px; margin: 0 0 25px 0;">Automated pipeline streaming raw data arrays directly onto remote rendering runners.</p>
+            
+            <div class="form-group">
+                <label for="prompt">Transformation Prompt</label>
+                <input type="text" id="prompt" value="remove the jacket">
+            </div>
 
-    <button id="submitBtn" onclick="startPipeline()">🚀 Process & Generate Image</button>
-    
-    <div id="status-box"></div>
+            <div class="dropzone-box" onclick="document.getElementById('imgFile').click()">
+                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--accent); margin-bottom: 10px;"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <p id="uploadLabel" style="margin: 0; font-weight: 500; font-size: 15px;">Click to Select Source Image</p>
+                <input type="file" id="imgFile" style="display: none;" accept="image/*" onchange="fileSelected(event)">
+            </div>
+            
+            <button class="btn-action" id="procBtn" onclick="startPipeline()" disabled>🚀 Process & Generate Image</button>
+        </div>
 
-    <div id="result-container">
-        <h3>🎉 Generation Complete!</h3>
-        <img id="output-image" src="" alt="Vheer AI Generated Output">
-        <button id="downloadBtn" class="download-btn">📥 Save Output Image (.png)</button>
+        <!-- PANEL B: REAL-TIME TELEMETRY TRACKER -->
+        <div class="card-panel" id="monetizationView" style="display: none;">
+            <h3 style="margin: 0;" id="statusTitle">Staging File Assets...</h3>
+            <p style="color: #94a3b8; font-size: 13px; margin: 5px 0 0 0;" id="statusDesc">Converting local pixel array maps into base64 transport clusters.</p>
+            <div class="progress-track"><div class="progress-fill" id="fillBar"></div></div>
+            <p id="percentLabel" style="font-size: 13px; color: var(--success); margin: 12px 0 0 0; font-weight: bold;">Pipeline State: Initializing</p>
+        </div>
+
+        <!-- PANEL C: DISPLAY & RETRIEVAL -->
+        <div class="card-panel" id="downloadView" style="display: none;">
+            <h3 style="margin: 0 0 15px 0; color: var(--success);">Generation Matrix Complete!</h3>
+            <img id="finalImg" src="" alt="Vheer Output Image"><br>
+            <button class="btn-action" style="background: var(--success);" onclick="downloadImage()">📥 Save Clean Image Asset (.png)</button>
+            <button class="btn-action" style="background: #334155; margin-top: 10px;" onclick="resetWorkspace()">Modify Another Image</button>
+        </div>
     </div>
-</div>
 
     <script>
     // --- CONFIGURE YOUR SPECIFIC DETAILS HERE ---
@@ -65,23 +79,44 @@
     const REPO_NAME = "YOUR_REPO_NAME";
     const WORKFLOW_FILE = "vheer_runner.yml";
 
-    function updateStatus(text, type) {
-        const box = document.getElementById("status-box");
-        box.innerText = text;
-        box.className = type;
-        box.style.display = "block";
-    }
+    // Global pipeline memory state blocks
+    let base64StringPayload = null;
+    let targetFileNameExtension = "input-image.png";
 
     function clearSavedToken() {
         localStorage.removeItem("VHEER_SECRET_KEY");
         alert("Saved GitHub Access Token cleared successfully.");
     }
 
+    /**
+     * Matches example image-loader engine. Reads the uploaded file object 
+     * and safely exposes the binary data values.
+     */
+    function fileSelected(e) {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                // FIXED: Extracts the exact raw Base64 string segment from the data URL structure
+                base64StringPayload = event.target.result.split(',')[1];
+                
+                // Update UI nodes to confirm target selection status
+                document.getElementById("uploadLabel").innerText = "Target Selected: " + file.name;
+                document.getElementById("procBtn").disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    /**
+     * Executes the cloud automated pipeline. Handles authorization, pushes code
+     * to the repo, and initializes the workflow tracker loop.
+     */
     async function startPipeline() {
         const prompt = document.getElementById("prompt").value.trim();
-        const fileInput = document.getElementById("imageFile");
-        const btn = document.getElementById("submitBtn");
-        const resultContainer = document.getElementById("result-container");
+        const btn = document.getElementById("procBtn");
 
         let token = localStorage.getItem("VHEER_SECRET_KEY");
         if (!token) {
@@ -92,84 +127,94 @@
             }
         }
 
-        if (!token) return updateStatus("❌ Aborted: Valid GitHub Access Token is required to operate.", "error");
-        if (!prompt) return updateStatus("❌ Please enter an instructions prompt text string.", "error");
-        if (fileInput.files.length === 0) return updateStatus("❌ Please choose a picture asset file.", "error");
+        if (!token) {
+            alert("Error: Valid access token required.");
+            return;
+        }
 
-        btn.disabled = true;
-        resultContainer.style.display = "none";
-        updateStatus("Encoding image data segments into base64 block structures...", "info");
-
-        // FIXED: Extract the single specific file node object from the FileList collection array
-        const targetedFileBlob = fileInput.files[0];
-        const reader = new FileReader();
+        // Swap view states into progress mode view
+        document.getElementById("mainWorkspace").style.display = "none";
+        document.getElementById("monetizationView").style.display = "block";
         
-        reader.onload = async () => {
-            try {
-                // FIXED: Pull index [1] to isolate the clean base64 data stream block text segment cleanly
-                const base64Content = reader.result.split(',')[1];
-                
-                updateStatus("Authorizing and handshaking with GitHub Cloud API servers...", "info");
-                
-                const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
-                const headers = { 
-                    "Authorization": `token ${token}`,
-                    "Accept": "application/vnd.github.v3+json",
-                    "Content-Type": "application/json"
-                };
+        const fillBar = document.getElementById("fillBar");
+        const percentLabel = document.getElementById("percentLabel");
+        
+        fillBar.style.width = "15%";
+        percentLabel.innerText = "Staging file asset into repository storage layer...";
 
-                const checkRes = await fetch(uploadUrl, { headers });
-                let sha = null;
-                if (checkRes.status === 200) {
-                    const meta = await checkRes.json();
-                    sha = meta.sha;
-                }
+        try {
+            const headers = { 
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
 
-                const uploadBody = {
-                    message: "Web UI File Update Trigger",
-                    content: base64Content,
-                    branch: "main"
-                };
-                if (sha) uploadBody.sha = sha;
-
-                const putRes = await fetch(uploadUrl, { method: "PUT", headers, body: JSON.stringify(uploadBody) });
-                if (!putRes.ok) throw new Error("Could not stage input image to your repository framework.");
-
-                const triggerTime = new Date().toISOString();
-                updateStatus("Staging complete. Spinning up automated browser engines...", "info");
-
-                const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
-                const dispatchRes = await fetch(dispatchUrl, {
-                    method: "POST",
-                    headers,
-                    body: JSON.stringify({ ref: "main", inputs: { prompt: prompt } })
-                });
-
-                if (dispatchRes.status !== 204 && dispatchRes.status !== 200) {
-                    const errorDetails = await dispatchRes.text();
-                    throw new Error(`GitHub Api Rejected Transaction: ${errorDetails}`);
-                }
-
-                pollWorkflowStatus(triggerTime);
-
-            } catch (error) {
-                updateStatus(`❌ Critical Execution Failure: ${error.message}`, "error");
-                btn.disabled = false;
+            // A. Overwrite input-image.png via Git Data API
+            const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
+            const checkRes = await fetch(uploadUrl, { headers });
+            let sha = null;
+            if (checkRes.status === 200) {
+                const meta = await checkRes.json();
+                sha = meta.sha;
             }
-        };
-        
-        // Pass the actual raw file node to avoid internal script crashing
-        reader.readAsDataURL(targetedFileBlob);
+
+            const putRes = await fetch(uploadUrl, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({
+                    message: "Web UI Interactive Upload Cluster",
+                    content: base64StringPayload,
+                    sha: sha || undefined,
+                    branch: "main"
+                })
+            });
+
+            if (!putRes.ok) throw new Error("File submission rejected by GitHub endpoint.");
+
+            fillBar.style.width = "35%";
+            document.getElementById("statusTitle").innerText = "Allocating Runner Nodes...";
+            percentLabel.innerText = "Spinning up virtual browser contexts...";
+
+            // B. Dispatch Cloud Workflow Run
+            const triggerTime = new Date().toISOString();
+            const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+            
+            const dispatchRes = await fetch(dispatchUrl, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ ref: "main", inputs: { prompt: prompt } })
+            });
+
+            if (dispatchRes.status !== 204 && dispatchRes.status !== 200) throw new Error("Workflow dispatch execution lock failed.");
+
+            // C. Enter Polling Sequence Status Block
+            pollWorkflowStatus(token, triggerTime);
+
+        } catch (error) {
+            alert(`Pipeline Error: ${error.message}`);
+            resetWorkspace();
+        }
     }
 
-    async function pollWorkflowStatus(triggerTime) {
-        const token = localStorage.getItem("VHEER_SECRET_KEY");
+    async function pollWorkflowStatus(token, triggerTime) {
         const headers = { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" };
         const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs`;
         
-        updateStatus("Pipeline successfully fired! Tracking action runner state allocation...", "info");
+        const fillBar = document.getElementById("fillBar");
+        const percentLabel = document.getElementById("percentLabel");
+        document.getElementById("statusTitle").innerText = "Vheer Platform Processing Active...";
+        
+        let simProgress = 35;
 
         const interval = setInterval(async () => {
+            // Update simulated tracking steps to indicate activity
+            if (simProgress < 90) {
+                simProgress += Math.floor(Math.random() * 3) + 1;
+                fillBar.style.width = simProgress + "%";
+                document.getElementById("statusDesc").innerText = "Awaiting response event telemetry from headless chromium loop...";
+                percentLabel.innerText = `Bypassing Cloudflare protection layers & generating graphic: ${simProgress}%`;
+            }
+
             try {
                 const res = await fetch(runsUrl, { headers });
                 if (!res.ok) return;
@@ -177,28 +222,24 @@
                 
                 const activeRun = data.workflow_runs.find(run => new Date(run.created_at) >= new Date(triggerTime));
                 
-                if (activeRun) {
-                    if (activeRun.status === "completed") {
-                        clearInterval(interval);
-                        if (activeRun.conclusion === "success") {
-                            updateStatus("Cloud generation resolved successfully! Fetching file binary...", "info");
-                            fetchPublicArtifact(activeRun.id);
-                        } else {
-                            updateStatus("❌ Cloud automation script failed. Review your GitHub Actions execution run logs.", "error");
-                            document.getElementById("submitBtn").disabled = false;
-                        }
-                    } else if (activeRun.status === "in_progress") {
-                        updateStatus("🔄 Vheer Platform is computing your request now... Browser processing active.", "info");
+                if (activeRun && activeRun.status === "completed") {
+                    clearInterval(interval);
+                    if (activeRun.conclusion === "success") {
+                        fillBar.style.width = "95%";
+                        percentLabel.innerText = "Unpacking artifact binary allocations...";
+                        fetchPublicArtifact(token, activeRun.id);
+                    } else {
+                        alert("Cloud automation script execution failed on runner node.");
+                        resetWorkspace();
                     }
                 }
             } catch (err) {
-                console.error("Polling check failed", err);
+                console.error("Polling query drop", err);
             }
         }, 7000);
     }
 
-    async function fetchPublicArtifact(runId) {
-        const token = localStorage.getItem("VHEER_SECRET_KEY");
+    async function fetchPublicArtifact(token, runId) {
         const headers = { "Authorization": `token ${token}` };
         const artifactUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/artifacts`;
         
@@ -206,9 +247,7 @@
             const res = await fetch(artifactUrl, { headers: { ...headers, "Accept": "application/vnd.github.v3+json" } });
             const data = await res.json();
             
-            if (!data.artifacts || data.artifacts.length === 0) {
-                throw new Error("No output assets found saved within build storage profiles.");
-            }
+            if (!data.artifacts || data.artifacts.length === 0) throw new Error("No artifacts found.");
 
             const targetArtifact = data.artifacts[0];
             const zipDownloadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifact.id}/zip`;
@@ -216,39 +255,48 @@
             const fileFetch = await fetch(zipDownloadUrl, { headers });
             const blobData = await fileFetch.blob();
             
+            // In-Memory Zip extraction layer
             const zip = await JSZip.loadAsync(blobData);
             const imageFileKey = Object.keys(zip.files).find(name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg'));
             
-            if (!imageFileKey) throw new Error("Could not find a valid output image file inside the package archive.");
+            if (!imageFileKey) throw new Error("Target graphic entry absent inside artifact map.");
             
             const unzippedBlob = await zip.files[imageFileKey].async("blob");
             const finalImageSrcUrl = URL.createObjectURL(unzippedBlob);
             
-            updateStatus("🎉 Generation Complete! View and save your image below.", "success");
+            document.getElementById("fillBar").style.width = "100%";
             
-            const resultContainer = document.getElementById("result-container");
-            const downloadBtn = document.getElementById("downloadBtn");
-            const outputImg = document.getElementById("output-image");
-            
-            outputImg.src = finalImageSrcUrl;
-            outputImg.style.display = "block";
-            
-            downloadBtn.onclick = () => {
-                const a = document.createElement("a");
-                a.href = finalImageSrcUrl;
-                a.download = imageFileKey || "vheer_output.png";
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            };
-            
-            resultContainer.style.display = "block";
-            document.getElementById("submitBtn").disabled = false;
+            setTimeout(() => {
+                document.getElementById("monetizationView").style.display = "none";
+                document.getElementById("downloadView").style.display = "block";
+                document.getElementById("finalImg").src = finalImageSrcUrl;
+            }, 600);
 
         } catch (error) {
-            updateStatus(`❌ Artifact extraction fail: ${error.message}`, "error");
-            document.getElementById("submitBtn").disabled = false;
+            alert(`Artifact Error: ${error.message}`);
+            resetWorkspace();
         }
+    }
+
+    function downloadImage() {
+        const downloadLink = document.createElement("a");
+        downloadLink.href = document.getElementById("finalImg").src;
+        downloadLink.download = "vheer_output_" + Date.now() + ".png";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+    }
+
+    function resetWorkspace() {
+        base64StringPayload = null;
+        document.getElementById("imgFile").value = "";
+        document.getElementById("uploadLabel").innerText = "Click to Select Source Image";
+        document.getElementById("procBtn").disabled = true;
+        document.getElementById("downloadView").style.display = "none";
+        document.getElementById("monetizationView").style.display = "none";
+        document.getElementById("mainWorkspace").style.display = "block";
+        document.getElementById("fillBar").style.width = "0%";
+        document.getElementById("statusTitle").innerText = "Staging File Assets...";
     }
 </script>
 </body>
