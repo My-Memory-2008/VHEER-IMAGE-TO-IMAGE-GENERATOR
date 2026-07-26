@@ -342,16 +342,6 @@
             font-size: 13px;
         }
 
-        .success-message {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid var(--success);
-            color: #86efac;
-            padding: 12px 14px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 13px;
-        }
-
         .file-selected {
             color: var(--success);
             font-size: 13px;
@@ -458,11 +448,11 @@
     </div>
 
     <script>
-        // Configuration
+        // Configuration - FIXED: Changed workflow name to vheer.yml
         const CONFIG = {
             REPO_OWNER: "My-Memory-2008",
             REPO_NAME: "VHEER-IMAGE-TO-IMAGE-GENERATOR",
-            WORKFLOW_FILE: "vheer_runner.yml",
+            WORKFLOW_FILE: "vheer.yml",
             TOKEN_KEY: "VHEER_GITHUB_TOKEN"
         };
 
@@ -475,7 +465,9 @@
         function checkFormReady() {
             const hasImage = uploadedImage !== null;
             const hasPrompt = document.getElementById("promptInput").value.trim().length > 0;
-            document.getElementById("generateBtn").disabled = !(hasImage && hasPrompt);
+            const isEnabled = hasImage && hasPrompt;
+            document.getElementById("generateBtn").disabled = !isEnabled;
+            console.log("Form check - Image:", hasImage, "Prompt:", hasPrompt, "Button enabled:", isEnabled);
         }
 
         // ============================================================================
@@ -538,6 +530,7 @@
                 uploadedImage = e.target.result.split(',')[1];
                 document.getElementById("fileName").style.display = "block";
                 document.getElementById("fileNameText").textContent = file.name;
+                console.log("Image loaded, triggering form check");
                 checkFormReady();
             };
             reader.readAsDataURL(file);
@@ -564,6 +557,7 @@
         // Generation Pipeline
         // ============================================================================
         async function startGeneration() {
+            console.log("Generate button clicked");
             const prompt = document.getElementById("promptInput").value.trim();
             
             if (!uploadedImage) {
@@ -588,6 +582,7 @@
             try {
                 await uploadImage(token, prompt);
             } catch (error) {
+                console.error("Pipeline error:", error);
                 showError(error.message);
                 resetUI();
             }
@@ -634,6 +629,7 @@
 
         async function dispatchWorkflow(token, prompt, triggerTime) {
             const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
+            console.log("Dispatching workflow to:", url);
             const headers = {
                 "Authorization": `token ${token}`,
                 "Accept": "application/vnd.github.v3+json",
@@ -646,8 +642,11 @@
                 body: JSON.stringify({ ref: "main", inputs: { prompt } })
             });
 
+            console.log("Dispatch response status:", res.status);
             if (res.status !== 204 && res.status !== 200) {
-                throw new Error("Failed to dispatch workflow. Check workflow file name.");
+                const errText = await res.text();
+                console.error("Dispatch error:", errText);
+                throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
             }
 
             updateProgress(50, "Waiting for workflow to complete...");
@@ -786,6 +785,7 @@
 
         // Initialize
         updateTokenStatus();
+        console.log("Page loaded - workflow file:", CONFIG.WORKFLOW_FILE);
     </script>
 </body>
 </html>
