@@ -1,7 +1,0 @@
-{
-  "name": "vheer-image-to-image-generator",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Vheer AI Image-to-Image Generator with serverless API (token hidden in Vercel env vars)",
-  "dependencies": {}
-}
