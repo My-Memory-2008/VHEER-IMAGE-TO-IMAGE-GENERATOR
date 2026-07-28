@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 
   try {
     // 1. Upload Input Image
-    const contentUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
+    const contentUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
     const checkRes = await fetch(contentUrl, { headers });
     let sha = null;
     if (checkRes.ok) {
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
     // 2. Dispatch Workflow
     const triggerTime = new Date().toISOString();
-    const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+    const dispatchUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
     const dispatchRes = await fetch(dispatchUrl, {
       method: "POST",
       headers,
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     }
 
     // 3. Poll Workflow until completion
-    const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs`;
+    const runsUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs`;
     let completedRunId = null;
     
     // Simple retry loop (max 3 minutes)
@@ -88,7 +88,7 @@ export default async function handler(req, res) {
     if (!completedRunId) throw new Error("Workflow timing out or unavailable.");
 
     // 4. Get Artifacts zip endpoint
-    const artifactUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs/${completedRunId}/artifacts`;
+    const artifactUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs/${completedRunId}/artifacts`;
     const artifactRes = await fetch(artifactUrl, { headers });
     if (!artifactRes.ok) throw new Error("Failed to parse run artifacts.");
     
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
       throw new Error("No output artifacts found.");
     }
 
-    const zipUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${artifactData.artifacts[0].id}/zip`;
+    const zipUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${artifactData.artifacts[0].id}/zip`;
     
     // Download the ZIP archive binary back to the frontend safely
     const zipFileRes = await fetch(zipUrl, { headers });
