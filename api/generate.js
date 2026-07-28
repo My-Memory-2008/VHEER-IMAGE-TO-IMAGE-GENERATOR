@@ -138,10 +138,11 @@ export default async function handler(req, res) {
   }
 
   const headers = {
-    "Authorization": `token ${token}`,
-    "Accept": "application/vnd.github.v3+json",
-    "Content-Type": "application/json",
-    "User-Agent": "Vercel-Serverless-Function"
+    "Authorization": `Bearer ${token}`,
+    "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "Vheer-AI-Image-App-Engine",
+    "Content-Type": "application/json"
   };
 
 
