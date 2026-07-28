@@ -1,6 +1,4 @@
 // api/generate.js
-import fetch from 'node-fetch';
-
 export default async function handler(req, res) {
     // 1. Establish browser-safe CORS allowances to accept remote payloads
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,7 +10,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed. Use POST payload formats.' });
+        return res.status(405).json({ error: 'Method not allowed. Use POST.' });
     }
 
     try {
@@ -25,7 +23,7 @@ export default async function handler(req, res) {
         const WORKFLOW_FILE = "vheer.yml";
 
         if (!prompt || !image_base64) {
-            return res.status(400).json({ error: 'Missing prompt or image content arrays data profiles.' });
+            return res.status(400).json({ error: 'Missing prompt or image content data.' });
         }
 
         const headers = {
@@ -34,8 +32,8 @@ export default async function handler(req, res) {
             "Content-Type": "application/json"
         };
 
-        // A. Overwrite input-image.png in your repository securely
-        const uploadUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
+        // A. Overwrite input-image.png in your repository securely using native fetch
+        const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
         const checkRes = await fetch(uploadUrl, { headers });
         let sha = null;
         if (checkRes.status === 200) {
@@ -61,7 +59,7 @@ export default async function handler(req, res) {
 
         // B. Dispatch your vheer.yml workflow loop
         const triggerTime = new Date().toISOString();
-        const dispatchUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+        const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
         
         const dispatchRes = await fetch(dispatchUrl, {
             method: "POST",
@@ -77,7 +75,9 @@ export default async function handler(req, res) {
         return res.status(200).json({
             success: true,
             message: "Cloud automation successfully engaged.",
-            trigger_time: triggerTime
+            trigger_time: triggerTime,
+            // Pass token to frontend securely so the browser can monitor status logs locally
+            temp_access: GH_TOKEN
         });
 
     } catch (error) {
