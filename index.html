@@ -530,19 +530,7 @@
             }
         }
 
-        async function getToken() {
-            let token = localStorage.getItem(CONFIG.TOKEN_KEY);
-            if (!token) {
-                token = prompt("🔒 Enter your GitHub Personal Access Token (requires 'repo' scope):");
-                if (token && token.trim()) {
-                    localStorage.setItem(CONFIG.TOKEN_KEY, token.trim());
-                    updateTokenStatus();
-                    return token.trim();
-                }
-                return null;
-            }
-            return token;
-        }
+        
 
         // ============================================================================
         // File Handling
@@ -595,11 +583,15 @@
         // ============================================================================
         // Generation Pipeline
         // ============================================================================
+        // 1. Force the client to look at the Vercel URL endpoint instead of hitting GitHub directly
+        const VERCEL_API_URL = "https://vheer-image-to-image-generator-lx3d5e5ov-awram-s-projects.vercel.app/"; 
+        
+        // 2. Modified tokenless frontend initialization method
         async function startGeneration() {
   console.log("Generate button clicked");
   const prompt = document.getElementById("promptInput").value.trim();
   
-  if (!uploadedImage) {
+  if (!uploadedImageDataUrl) { // Use the variable holding your base64 string
     showError("Please select an image");
     return;
   }
@@ -612,32 +604,38 @@
   showProcessing();
 
   try {
-    // Send data to your secure Vercel proxy backend instead of GitHub directly
-    updateProgress(15, "Uploading image via secure tunnel...");
-    const response = await fetch("https://vercel.app", {
+    updateProgress(15, "Uploading image securely via backend server...");
+    
+    // Remote payload submission to Vercel
+    const response = await fetch(VERCEL_API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        image: uploadedImage,
+        image: uploadedImageDataUrl, 
         prompt: prompt
       })
     });
 
-    if (!response.ok) throw new Error("Server failed to process image.");
+    const resultData = await response.json();
+    if (!response.ok) throw new Error(resultData.error || "Server processing failed.");
+
+    updateProgress(50, "Waiting for workflow pipeline execution...");
     
-    const data = await response.json();
-    updateProgress(50, "Processing complete! Loading results...");
-    
-    // Process your workflow or artifact retrieval using a public run ID from the response
-    await pollWorkflowWithoutToken(data.runId); 
+    // Continue loop checking for execution status
+    // Note: Since public visitors don't have tokens, pollWorkflow must run directly 
+    // using an unauthenticated public runtime call or a dedicated status endpoint.
+    await pollWorkflowWithoutToken(resultData.triggerTime);
 
   } catch (error) {
-    console.error("Pipeline error:", error);
+    console.error("Pipeline failure context:", error);
     showError(error.message);
     resetUI();
   }
+}
+
+// 3. Keep getToken dummy placeholder clean so it never prompts your user again
+async function getToken() {
+  return "TOKEN_NOT_NEEDED_ON_FRONTEND";
 }
 
         
