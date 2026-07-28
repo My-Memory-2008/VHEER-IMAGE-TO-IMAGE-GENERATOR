@@ -435,7 +435,8 @@
                 <div class="upload-icon">📷</div>
                 <div class="upload-text">Click to upload or drag & drop</div>
                 <div class="upload-hint">Supports JPG, PNG, WebP (Max 10MB)</div>
-                <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+                <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+
             </div>
 
             <!-- Image Preview Container -->
@@ -599,16 +600,27 @@
   API_URL: "https://vheer-image-to-image-generator-ftncpq1c7-awram-s-projects.vercel.app" // <-- Add your Vercel URL here
 };
         async function startGeneration() {
-  console.log("Generation initialization hooks triggered.");
+  console.log("Generation process started.");
   const prompt = document.getElementById("promptInput").value.trim();
   
-  // Make sure this matches your variable name holding the raw Base64 string data
-  if (!uploadedImage) { 
-    showError("Please pick a source file asset first.");
+  // Auto-detect which image variable your file layout is using
+  let targetImageBase64 = null;
+  
+  if (typeof uploadedImage !== 'undefined' && uploadedImage) {
+    targetImageBase64 = uploadedImage;
+  } else if (typeof uploadedImageDataUrl !== 'undefined' && uploadedImageDataUrl) {
+    targetImageBase64 = uploadedImageDataUrl;
+  } else if (typeof currentImageBase64 !== 'undefined' && currentImageBase64) {
+    targetImageBase64 = currentImageBase64;
+  }
+
+  // If no image data is loaded in any format, display a frontend prompt error
+  if (!targetImageBase64) { 
+    showError("Please pick or upload a source image first.");
     return;
   }
   if (!prompt) {
-    showError("Please draft a generative text target modification prompt.");
+    showError("Please enter an image modification prompt.");
     return;
   }
 
@@ -618,30 +630,31 @@
   try {
     updateProgress(20, "Packaging file asset matrix and relaying securely...");
 
-    // Send payload directly to Vercel (Vercel uses your hidden token to talk to GitHub)
+    // Send payload directly to your Vercel Proxy
     const response = await fetch(CONFIG.API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        image: uploadedImage, 
+        image: targetImageBase64, 
         prompt: prompt
       })
     });
 
     const resultData = await response.json();
-    if (!response.ok) throw new Error(resultData.error || "Upstream server error encountered.");
+    if (!response.ok) throw new Error(resultData.error || "Upstream backend error encountered.");
 
-    updateProgress(50, "Remote workflow execution synchronized successfully. Simulating engine run tracking...");
+    updateProgress(50, "Remote workflow execution synchronized successfully. Tracking runner runtime...");
     
-    // Call your checking loop safely without token validations
+    // Begin your checking tracking loop
     await pollWorkflowWithoutToken();
 
   } catch (error) {
-    console.error("Pipeline breakdown trace context:", error);
+    console.error("Pipeline failure context details:", error);
     showError(error.message);
     resetUI();
   }
 }
+
 
 
 // Clear token placeholder function to prevent breaking older function calls
