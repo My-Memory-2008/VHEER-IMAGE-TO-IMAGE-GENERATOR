@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vheer AI Image Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -334,6 +335,32 @@
             display: none !important;
         }
 
+        .token-manager {
+            background: rgba(37, 99, 235, 0.05);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .token-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .token-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
         .error-message {
             background: rgba(239, 68, 68, 0.1);
             border: 1px solid var(--danger);
@@ -386,13 +413,18 @@
             </div>
         </div>
 
-        <!-- Error Panel (at top so it's always visible) -->
-        <div class="error-message hidden" id="errorPanel"></div>
-
         <!-- Main Panel -->
         <div class="card" id="inputPanel">
+            <button class="btn-small btn-danger" onclick="clearToken()">Clear Token</button>
             <h2>Image Transformation</h2>
             <p class="card-description">Upload an image and describe the transformation you want</p>
+
+            <div class="token-manager" id="tokenStatus">
+                <span class="token-status">
+                    <span class="token-dot"></span>
+                    Token not configured
+                </span>
+            </div>
 
             <div class="form-group">
                 <label for="promptInput">Transformation Prompt</label>
@@ -422,7 +454,7 @@
         </div>
 
         <!-- Processing Panel -->
-        <div class="card hidden" id="processingPanel">
+        <div class="card" id="processingPanel" class="hidden">
             <h2 id="processingTitle">Processing...</h2>
             <p class="card-description" id="processingDesc">Uploading your image and preparing generation</p>
             
@@ -436,7 +468,7 @@
         </div>
 
         <!-- Result Panel -->
-        <div class="card hidden" id="resultPanel">
+        <div class="card" id="resultPanel" class="hidden">
             <h2 style="color: var(--success); margin-bottom: 15px;">✓ Complete!</h2>
             <img id="resultImage" class="result-image" src="" alt="Generated image">
             
@@ -445,44 +477,23 @@
                 <button class="btn-secondary" onclick="resetUI()">✎ Another Image</button>
             </div>
         </div>
+
+        <!-- Error Panel -->
+        <div class="error-message hidden" id="errorPanel"></div>
     </div>
 
     <script>
+        // Configuration - FIXED: Changed workflow name to vheer.yml
+        const CONFIG = {
+            REPO_OWNER: "My-Memory-2008",
+            REPO_NAME: "VHEER-IMAGE-TO-IMAGE-GENERATOR",
+            WORKFLOW_FILE: "vheer.yml",
+            TOKEN_KEY: "VHEER_GITHUB_TOKEN"
+        };
+
         let uploadedImage = null;
         let currentResultUrl = null;
         let uploadedImageDataUrl = null;
-        let pollTimer = null;
-        let currentTriggerTime = null;
-
-        // ============================================================================
-        // Image Compression (Vercel serverless has ~4.5MB body limit)
-        // ============================================================================
-        function compressImage(dataUrl, maxDim = 1024, quality = 0.85) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    let w = img.width, h = img.height;
-                    if (w > maxDim || h > maxDim) {
-                        const ratio = w / h;
-                        if (ratio >= 1) { w = maxDim; h = Math.round(maxDim / ratio); }
-                        else { h = maxDim; w = Math.round(maxDim * ratio); }
-                    }
-                    const canvas = document.createElement("canvas");
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-                    canvas.toBlob(blob => {
-                        if (blob) {
-                            const reader = new FileReader();
-                            reader.onload = e => resolve(e.target.result);
-                            reader.onerror = () => reject(new Error("Compression failed"));
-                            reader.readAsDataURL(blob);
-                        } else reject(new Error("Compression failed"));
-                    }, "image/jpeg", quality);
-                };
-                img.onerror = () => reject(new Error("Failed to load image"));
-                img.src = dataUrl;
-            });
-        }
 
         // ============================================================================
         // Form Validation
@@ -492,6 +503,50 @@
             const hasPrompt = document.getElementById("promptInput").value.trim().length > 0;
             const isEnabled = hasImage && hasPrompt;
             document.getElementById("generateBtn").disabled = !isEnabled;
+            console.log("Form check - Image:", hasImage, "Prompt:", hasPrompt, "Button enabled:", isEnabled);
+        }
+
+        // ============================================================================
+        // Token Management
+        // ============================================================================
+        function clearToken() {
+            localStorage.removeItem(CONFIG.TOKEN_KEY);
+            updateTokenStatus();
+            alert("Token cleared successfully");
+        }
+
+        function updateTokenStatus() {
+            const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+            const statusEl = document.getElementById("tokenStatus");
+            if (token) {
+                statusEl.innerHTML = `
+                    <span class="token-status">
+                        <span class="token-dot"></span>
+                        Token: ${token.substring(0, 10)}...
+                    </span>
+                `;
+            } else {
+                statusEl.innerHTML = `
+                    <span class="token-status">
+                        <span class="token-dot" style="background: #ef4444;"></span>
+                        Token not configured
+                    </span>
+                `;
+            }
+        }
+
+        async function getToken() {
+            let token = localStorage.getItem(CONFIG.TOKEN_KEY);
+            if (!token) {
+                token = prompt("🔒 Enter your GitHub Personal Access Token (requires 'repo' scope):");
+                if (token && token.trim()) {
+                    localStorage.setItem(CONFIG.TOKEN_KEY, token.trim());
+                    updateTokenStatus();
+                    return token.trim();
+                }
+                return null;
+            }
+            return token;
         }
 
         // ============================================================================
@@ -508,14 +563,18 @@
 
             const reader = new FileReader();
             reader.onload = (e) => {
-                uploadedImageDataUrl = e.target.result;
-                uploadedImage = e.target.result.split(',')[1];
+                uploadedImageDataUrl = e.target.result; // Full data URL with header
+                uploadedImage = e.target.result.split(',')[1]; // Base64 only
                 
+                // Show preview
                 document.getElementById("previewImage").src = uploadedImageDataUrl;
                 document.getElementById("previewContainer").classList.add("show");
+                
+                // Show filename
                 document.getElementById("fileName").style.display = "block";
                 document.getElementById("fileNameText").textContent = file.name;
                 
+                console.log("Image loaded, triggering form check");
                 checkFormReady();
             };
             reader.readAsDataURL(file);
@@ -539,9 +598,10 @@
         });
 
         // ============================================================================
-        // Generation Pipeline — calls serverless API (token hidden server-side)
+        // Generation Pipeline
         // ============================================================================
         async function startGeneration() {
+            console.log("Generate button clicked");
             const prompt = document.getElementById("promptInput").value.trim();
             
             if (!uploadedImage) {
@@ -554,87 +614,164 @@
                 return;
             }
 
+            const token = await getToken();
+            if (!token) {
+                showError("Token required. Please provide a GitHub PAT.");
+                return;
+            }
+
             clearError();
             showProcessing();
             
             try {
-                alert("Step 1: Starting compression");
-                updateProgress(5, "Compressing image...");
-                const compressedDataUrl = await compressImage(uploadedImageDataUrl);
-                alert("Step 2: Compression done, base64 length: " + compressedDataUrl.length);
-                const compressedBase64 = compressedDataUrl.split(",")[1];
-                
-                updateProgress(15, "Uploading image...");
-                alert("Step 3: Calling /api/generate");
-                const res = await fetch("/api/generate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "start", image: compressedBase64, prompt: prompt }),
-                });
-                alert("Step 4: Got response status " + res.status);
-                if (!res.ok) throw new Error("Server error (" + res.status + ")");
-                const data = await res.json();
-                alert("Step 5: Response: " + JSON.stringify(data).substring(0, 200));
-                if (!data.ok) throw new Error(data.error || "Failed to start generation");
-
-                currentTriggerTime = data.triggerTime;
-                updateProgress(35, "Workflow dispatched. Generating...");
-                alert("Step 6: Starting to poll");
-                startPolling();
+                await uploadImage(token, prompt);
             } catch (error) {
-                alert("CAUGHT ERROR: " + error.message + "\n\nStack: " + error.stack);
-                console.error("Generation error:", error);
-                showError(error.message || "Something went wrong. Please try again.");
-                document.getElementById("processingPanel").classList.add("hidden");
-                document.getElementById("inputPanel").classList.remove("hidden");
+                console.error("Pipeline error:", error);
+                showError(error.message);
+                resetUI();
             }
         }
 
-        function startPolling() {
-            if (pollTimer) clearInterval(pollTimer);
-            let progress = 35;
-            let attempts = 0;
-            const maxAttempts = 72; // 72 × 5s = 6 min max
-            pollTimer = setInterval(async () => {
-                attempts++;
-                if (attempts > maxAttempts) {
-                    clearInterval(pollTimer);
-                    showError("Generation timed out. Please try again.");
-                    document.getElementById("processingPanel").classList.add("hidden");
-                    document.getElementById("inputPanel").classList.remove("hidden");
-                    return;
-                }
-                try {
-                    const res = await fetch("/api/generate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "poll", triggerTime: currentTriggerTime }),
-                    });
-                    if (!res.ok) throw new Error("Server error (" + res.status + ")");
-                    const data = await res.json();
-                    if (!data.ok) throw new Error(data.error);
+        async function uploadImage(token, prompt) {
+            updateProgress(15, "Uploading image to repository...");
 
-                    if (data.status === "done") {
-                        clearInterval(pollTimer);
-                        currentResultUrl = data.image;
-                        updateProgress(100, "Done!");
-                        setTimeout(showResult, 500);
-                    } else if (data.status === "failed") {
-                        clearInterval(pollTimer);
-                        showError(data.error || "Generation failed");
-                        resetUI();
-                    } else {
-                        progress = Math.min(90, progress + 3);
-                        updateProgress(progress, data.message || "Generating...");
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/contents/input-image.png`;
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
+
+            // Get current SHA
+            const checkRes = await fetch(url, { headers });
+            let sha = null;
+            if (checkRes.ok) {
+                const data = await checkRes.json();
+                sha = data.sha;
+            }
+
+            // Upload image
+            const uploadRes = await fetch(url, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({
+                    message: `[Web UI] Image upload at ${new Date().toISOString()}`,
+                    content: uploadedImage,
+                    sha: sha || undefined,
+                    branch: "main"
+                })
+            });
+
+            if (!uploadRes.ok) {
+                throw new Error("Failed to upload image. Check your token and repo settings.");
+            }
+
+            updateProgress(35, "Dispatching workflow...");
+            const triggerTime = new Date().toISOString();
+            await dispatchWorkflow(token, prompt, triggerTime);
+        }
+
+        async function dispatchWorkflow(token, prompt, triggerTime) {
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
+            console.log("Dispatching workflow to:", url);
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
+
+            const res = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ ref: "main", inputs: { prompt } })
+            });
+
+            console.log("Dispatch response status:", res.status);
+            if (res.status !== 204 && res.status !== 200) {
+                const errText = await res.text();
+                console.error("Dispatch error:", errText);
+                throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
+            }
+
+            updateProgress(50, "Waiting for workflow to complete...");
+            await pollWorkflow(token, triggerTime);
+        }
+
+        async function pollWorkflow(token, triggerTime) {
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json"
+            };
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs`;
+
+            let progress = 50;
+            const pollInterval = setInterval(async () => {
+                try {
+                    // Simulate progress
+                    if (progress < 85) {
+                        progress += Math.random() * 8;
+                        updateProgress(Math.min(progress, 85), "Generating image...");
+                    }
+
+                    const res = await fetch(url, { headers });
+                    if (!res.ok) return;
+
+                    const data = await res.json();
+                    const recentRun = data.workflow_runs.find(
+                        run => new Date(run.created_at) >= new Date(triggerTime)
+                    );
+
+                    if (recentRun && recentRun.status === "completed") {
+                        clearInterval(pollInterval);
+
+                        if (recentRun.conclusion === "success") {
+                            updateProgress(95, "Fetching result...");
+                            await fetchArtifact(token, recentRun.id);
+                        } else {
+                            throw new Error("Workflow failed. Check the workflow logs for details.");
+                        }
                     }
                 } catch (error) {
-                    clearInterval(pollTimer);
-                    console.error("Polling error:", error);
-                    showError(error.message || "Something went wrong. Please try again.");
-                    document.getElementById("processingPanel").classList.add("hidden");
-                    document.getElementById("inputPanel").classList.remove("hidden");
+                    clearInterval(pollInterval);
+                    throw error;
                 }
             }, 5000);
+        }
+
+        async function fetchArtifact(token, runId) {
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json"
+            };
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs/${runId}/artifacts`;
+
+            const res = await fetch(url, { headers });
+            if (!res.ok) throw new Error("Failed to fetch artifacts");
+
+            const data = await res.json();
+            if (!data.artifacts || data.artifacts.length === 0) {
+                throw new Error("No artifacts found");
+            }
+
+            const artifact = data.artifacts[0];
+            const zipUrl = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/artifacts/${artifact.id}/zip`;
+
+            updateProgress(98, "Extracting image...");
+            const zipRes = await fetch(zipUrl, { headers });
+            const blob = await zipRes.blob();
+
+            const zip = await JSZip.loadAsync(blob);
+            const imageFile = Object.keys(zip.files).find(
+                name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')
+            );
+
+            if (!imageFile) throw new Error("No image found in artifact");
+
+            const imageBlob = await zip.files[imageFile].async("blob");
+            currentResultUrl = URL.createObjectURL(imageBlob);
+
+            updateProgress(100, "Done!");
+            setTimeout(showResult, 500);
         }
 
         // ============================================================================
@@ -660,7 +797,6 @@
         }
 
         function resetUI() {
-            if (pollTimer) clearInterval(pollTimer);
             document.getElementById("inputPanel").classList.remove("hidden");
             document.getElementById("processingPanel").classList.add("hidden");
             document.getElementById("resultPanel").classList.add("hidden");
@@ -670,8 +806,6 @@
             document.getElementById("previewContainer").classList.remove("show");
             uploadedImage = null;
             uploadedImageDataUrl = null;
-            currentResultUrl = null;
-            currentTriggerTime = null;
             checkFormReady();
             clearError();
         }
@@ -689,13 +823,15 @@
             const panel = document.getElementById("errorPanel");
             panel.textContent = "⚠ " + message;
             panel.classList.remove("hidden");
-            console.error("VHEER ERROR:", message);
-            window.scrollTo(0, 0);
         }
 
         function clearError() {
             document.getElementById("errorPanel").classList.add("hidden");
         }
+
+        // Initialize
+        updateTokenStatus();
+        console.log("Page loaded - workflow file:", CONFIG.WORKFLOW_FILE);
     </script>
 </body>
 </html>
