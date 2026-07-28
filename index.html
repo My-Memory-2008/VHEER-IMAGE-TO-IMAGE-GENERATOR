@@ -417,7 +417,7 @@
         </div>
 
         <!-- Processing Panel -->
-        <div class="card" id="processingPanel">
+        <div class="card hidden" id="processingPanel">
             <h2 id="processingTitle">Processing...</h2>
             <p class="card-description" id="processingDesc">Uploading your image and preparing generation</p>
             
@@ -431,7 +431,7 @@
         </div>
 
         <!-- Result Panel -->
-        <div class="card" id="resultPanel">
+        <div class="card hidden" id="resultPanel">
             <h2 style="color: var(--success); margin-bottom: 15px;">✓ Complete!</h2>
             <img id="resultImage" class="result-image" src="" alt="Generated image">
             
@@ -451,6 +451,36 @@
         let uploadedImageDataUrl = null;
         let pollTimer = null;
         let currentTriggerTime = null;
+
+        // ============================================================================
+        // Image Compression (Vercel serverless has ~4.5MB body limit)
+        // ============================================================================
+        function compressImage(dataUrl, maxDim = 1024, quality = 0.85) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width, h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        const ratio = w / h;
+                        if (ratio >= 1) { w = maxDim; h = Math.round(maxDim / ratio); }
+                        else { h = maxDim; w = Math.round(maxDim * ratio); }
+                    }
+                    const canvas = document.createElement("canvas");
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(blob => {
+                        if (blob) {
+                            const reader = new FileReader();
+                            reader.onload = e => resolve(e.target.result);
+                            reader.onerror = () => reject(new Error("Compression failed"));
+                            reader.readAsDataURL(blob);
+                        } else reject(new Error("Compression failed"));
+                    }, "image/jpeg", quality);
+                };
+                img.onerror = () => reject(new Error("Failed to load image"));
+                img.src = dataUrl;
+            });
+        }
 
         // ============================================================================
         // Form Validation
@@ -526,12 +556,17 @@
             showProcessing();
             
             try {
+                updateProgress(5, "Compressing image...");
+                const compressedDataUrl = await compressImage(uploadedImageDataUrl);
+                const compressedBase64 = compressedDataUrl.split(",")[1];
+                
                 updateProgress(15, "Uploading image...");
                 const res = await fetch("/api/generate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "start", image: uploadedImage, prompt: prompt }),
+                    body: JSON.stringify({ action: "start", image: compressedBase64, prompt: prompt }),
                 });
+                if (!res.ok) throw new Error("Server error (" + res.status + ")");
                 const data = await res.json();
                 if (!data.ok) throw new Error(data.error || "Failed to start generation");
 
@@ -547,13 +582,23 @@
         function startPolling() {
             if (pollTimer) clearInterval(pollTimer);
             let progress = 35;
+            let attempts = 0;
+            const maxAttempts = 72; // 72 × 5s = 6 min max
             pollTimer = setInterval(async () => {
+                attempts++;
+                if (attempts > maxAttempts) {
+                    clearInterval(pollTimer);
+                    showError("Generation timed out. Please try again.");
+                    resetUI();
+                    return;
+                }
                 try {
                     const res = await fetch("/api/generate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ action: "poll", triggerTime: currentTriggerTime }),
                     });
+                    if (!res.ok) throw new Error("Server error (" + res.status + ")");
                     const data = await res.json();
                     if (!data.ok) throw new Error(data.error);
 
@@ -564,9 +609,10 @@
                         setTimeout(showResult, 500);
                     } else if (data.status === "failed") {
                         clearInterval(pollTimer);
-                        throw new Error(data.error || "Generation failed");
+                        showError(data.error || "Generation failed");
+                        resetUI();
                     } else {
-                        progress = Math.min(90, progress + Math.random() * 6);
+                        progress = Math.min(90, progress + 3);
                         updateProgress(progress, data.message || "Generating...");
                     }
                 } catch (error) {
