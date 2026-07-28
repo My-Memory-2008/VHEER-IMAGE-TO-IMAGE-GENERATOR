@@ -509,45 +509,45 @@
         // ============================================================================
         // Token Management
         // ============================================================================
-        function clearToken() {
-            localStorage.removeItem(CONFIG.TOKEN_KEY);
-            updateTokenStatus();
-            alert("Token cleared successfully");
-        }
+        // function clearToken() {
+        //     localStorage.removeItem(CONFIG.TOKEN_KEY);
+        //     updateTokenStatus();
+        //     alert("Token cleared successfully");
+        // }
 
-        function updateTokenStatus() {
-            const token = localStorage.getItem(CONFIG.TOKEN_KEY);
-            const statusEl = document.getElementById("tokenStatus");
-            if (token) {
-                statusEl.innerHTML = `
-                    <span class="token-status">
-                        <span class="token-dot"></span>
-                        Token: ${token.substring(0, 10)}...
-                    </span>
-                `;
-            } else {
-                statusEl.innerHTML = `
-                    <span class="token-status">
-                        <span class="token-dot" style="background: #ef4444;"></span>
-                        Token not configured
-                    </span>
-                `;
-            }
-        }
+        // function updateTokenStatus() {
+        //     const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+        //     const statusEl = document.getElementById("tokenStatus");
+        //     if (token) {
+        //         statusEl.innerHTML = `
+        //             <span class="token-status">
+        //                 <span class="token-dot"></span>
+        //                 Token: ${token.substring(0, 10)}...
+        //             </span>
+        //         `;
+        //     } else {
+        //         statusEl.innerHTML = `
+        //             <span class="token-status">
+        //                 <span class="token-dot" style="background: #ef4444;"></span>
+        //                 Token not configured
+        //             </span>
+        //         `;
+        //     }
+        // }
 
-        async function getToken() {
-            let token = localStorage.getItem(CONFIG.TOKEN_KEY);
-            if (!token) {
-                token = prompt("🔒 Enter your GitHub Personal Access Token (requires 'repo' scope):");
-                if (token && token.trim()) {
-                    localStorage.setItem(CONFIG.TOKEN_KEY, token.trim());
-                    updateTokenStatus();
-                    return token.trim();
-                }
-                return null;
-            }
-            return token;
-        }
+        // async function getToken() {
+        //     let token = localStorage.getItem(CONFIG.TOKEN_KEY);
+        //     if (!token) {
+        //         token = prompt("🔒 Enter your GitHub Personal Access Token (requires 'repo' scope):");
+        //         if (token && token.trim()) {
+        //             localStorage.setItem(CONFIG.TOKEN_KEY, token.trim());
+        //             updateTokenStatus();
+        //             return token.trim();
+        //         }
+        //         return null;
+        //     }
+        //     return token;
+        // }
 
         // ============================================================================
         // File Handling
@@ -601,101 +601,118 @@
         // Generation Pipeline
         // ============================================================================
         async function startGeneration() {
-            console.log("Generate button clicked");
-            const prompt = document.getElementById("promptInput").value.trim();
-            
-            if (!uploadedImage) {
-                showError("Please select an image");
-                return;
-            }
-            
-            if (!prompt) {
-                showError("Please enter a prompt");
-                return;
-            }
+    console.log("Generate button clicked");
+    const prompt = document.getElementById("promptInput").value.trim();
+    
+    if (!uploadedImage) {
+        showError("Please select an image");
+        return;
+    }
+    
+    if (!prompt) {
+        showError("Please enter a prompt");
+        return;
+    }
 
-            const token = await getToken();
-            if (!token) {
-                showError("Token required. Please provide a GitHub PAT.");
-                return;
-            }
+    // REMOVED: No more calling getToken() or checking browser memory strings
+    clearError();
+    showProcessing();
+    
+    try {
+        // Change this URL string to match your live Vercel production address once deployed!
+        const PROXY_SERVERLESS_API = "https://YOUR_VERCEL_PROJECT_NAME.vercel.app/api/generate";
+        
+        updateProgress(15, "Routing payload directly to serverless api proxy...");
 
-            clearError();
-            showProcessing();
-            
-            try {
-                await uploadImage(token, prompt);
-            } catch (error) {
-                console.error("Pipeline error:", error);
-                showError(error.message);
-                resetUI();
-            }
-        }
+        const response = await fetch(PROXY_SERVERLESS_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                prompt: prompt,
+                image_base64: uploadedImage // This is your pre-split pure Base64 code string block
+            })
+        });
 
-        async function uploadImage(token, prompt) {
-            updateProgress(15, "Uploading image to repository...");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Server connection dropped during upload handoff.");
 
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/contents/input-image.png`;
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
+        updateProgress(35, "Pipeline successfully engaged...");
+        
+        // Pass control to your active artifact polling tracker framework using returned tokenless logs data
+        pollWorkflowStatus(null, data.trigger_time);
 
-            // Get current SHA
-            const checkRes = await fetch(url, { headers });
-            let sha = null;
-            if (checkRes.ok) {
-                const data = await checkRes.json();
-                sha = data.sha;
-            }
+    } catch (error) {
+        console.error("Pipeline error:", error);
+        showError(error.message);
+        resetUI();
+    }
+}
 
-            // Upload image
-            const uploadRes = await fetch(url, {
-                method: "PUT",
-                headers,
-                body: JSON.stringify({
-                    message: `[Web UI] Image upload at ${new Date().toISOString()}`,
-                    content: uploadedImage,
-                    sha: sha || undefined,
-                    branch: "main"
-                })
-            });
 
-            if (!uploadRes.ok) {
-                throw new Error("Failed to upload image. Check your token and repo settings.");
-            }
+        // async function uploadImage(token, prompt) {
+        //     updateProgress(15, "Uploading image to repository...");
 
-            updateProgress(35, "Dispatching workflow...");
-            const triggerTime = new Date().toISOString();
-            await dispatchWorkflow(token, prompt, triggerTime);
-        }
+        //     const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/contents/input-image.png`;
+        //     const headers = {
+        //         "Authorization": `token ${token}`,
+        //         "Accept": "application/vnd.github.v3+json",
+        //         "Content-Type": "application/json"
+        //     };
 
-        async function dispatchWorkflow(token, prompt, triggerTime) {
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
-            console.log("Dispatching workflow to:", url);
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
+        //     // Get current SHA
+        //     const checkRes = await fetch(url, { headers });
+        //     let sha = null;
+        //     if (checkRes.ok) {
+        //         const data = await checkRes.json();
+        //         sha = data.sha;
+        //     }
 
-            const res = await fetch(url, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ ref: "main", inputs: { prompt } })
-            });
+        //     // Upload image
+        //     const uploadRes = await fetch(url, {
+        //         method: "PUT",
+        //         headers,
+        //         body: JSON.stringify({
+        //             message: `[Web UI] Image upload at ${new Date().toISOString()}`,
+        //             content: uploadedImage,
+        //             sha: sha || undefined,
+        //             branch: "main"
+        //         })
+        //     });
 
-            console.log("Dispatch response status:", res.status);
-            if (res.status !== 204 && res.status !== 200) {
-                const errText = await res.text();
-                console.error("Dispatch error:", errText);
-                throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
-            }
+        //     if (!uploadRes.ok) {
+        //         throw new Error("Failed to upload image. Check your token and repo settings.");
+        //     }
 
-            updateProgress(50, "Waiting for workflow to complete...");
-            await pollWorkflow(token, triggerTime);
-        }
+        //     updateProgress(35, "Dispatching workflow...");
+        //     const triggerTime = new Date().toISOString();
+        //     await dispatchWorkflow(token, prompt, triggerTime);
+        // }
+
+        // async function dispatchWorkflow(token, prompt, triggerTime) {
+        //     const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
+        //     console.log("Dispatching workflow to:", url);
+        //     const headers = {
+        //         "Authorization": `token ${token}`,
+        //         "Accept": "application/vnd.github.v3+json",
+        //         "Content-Type": "application/json"
+        //     };
+
+        //     const res = await fetch(url, {
+        //         method: "POST",
+        //         headers,
+        //         body: JSON.stringify({ ref: "main", inputs: { prompt } })
+        //     });
+
+        //     console.log("Dispatch response status:", res.status);
+        //     if (res.status !== 204 && res.status !== 200) {
+        //         const errText = await res.text();
+        //         console.error("Dispatch error:", errText);
+        //         throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
+        //     }
+
+        //     updateProgress(50, "Waiting for workflow to complete...");
+        //     await pollWorkflow(token, triggerTime);
+        // }
 
         async function pollWorkflow(token, triggerTime) {
             const headers = {
