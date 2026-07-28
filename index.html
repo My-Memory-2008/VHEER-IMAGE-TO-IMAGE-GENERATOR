@@ -574,8 +574,10 @@
                 updateProgress(35, "Workflow dispatched. Generating...");
                 startPolling();
             } catch (error) {
-                showError(error.message);
-                resetUI();
+                console.error("Generation error:", error);
+                showError(error.message || "Something went wrong. Please try again.");
+                document.getElementById("processingPanel").classList.add("hidden");
+                document.getElementById("inputPanel").classList.remove("hidden");
             }
         }
 
@@ -589,7 +591,8 @@
                 if (attempts > maxAttempts) {
                     clearInterval(pollTimer);
                     showError("Generation timed out. Please try again.");
-                    resetUI();
+                    document.getElementById("processingPanel").classList.add("hidden");
+                    document.getElementById("inputPanel").classList.remove("hidden");
                     return;
                 }
                 try {
@@ -617,8 +620,10 @@
                     }
                 } catch (error) {
                     clearInterval(pollTimer);
-                    showError(error.message);
-                    resetUI();
+                    console.error("Polling error:", error);
+                    showError(error.message || "Something went wrong. Please try again.");
+                    document.getElementById("processingPanel").classList.add("hidden");
+                    document.getElementById("inputPanel").classList.remove("hidden");
                 }
             }, 5000);
         }
