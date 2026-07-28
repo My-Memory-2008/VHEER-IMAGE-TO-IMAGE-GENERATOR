@@ -147,11 +147,20 @@ export default async function handler(req, res) {
 
     // Extract only raw Base64 characters if a data URL prefix is present
   let cleanBase64 = imageBase64;
-  if (cleanBase64.includes(',')) {
-    cleanBase64 = cleanBase64.split(',')[1];
+  
+  // 1. If it's an array or containing stringified elements, extract the last item
+  if (Array.isArray(cleanBase64)) {
+    cleanBase64 = cleanBase64[cleanBase64.length - 1];
+  } else if (typeof cleanBase64 === 'string' && cleanBase64.includes(',')) {
+    cleanBase64 = cleanBase64.split(',').pop();
   }
-  // Strip out any accidental newline strings or spaces
+  
+  // 2. Clear out any browser metadata headers, whitespaces, or hidden line breaks
+  cleanBase64 = cleanBase64.replace(/^data:image\/[a-z]+;base64,/, "");
   cleanBase64 = cleanBase64.replace(/\s/g, '');
+
+  // Verify the string is clear
+  console.log("Sanitized Base64 Head Check:", cleanBase64.substring(0, 30));
 
   try {
     console.log("Pipeline started. checking if old input-image exists...");
@@ -165,17 +174,17 @@ export default async function handler(req, res) {
       sha = checkData.sha;
     }
 
-    console.log("Uploading file to GitHub repository...");
+        console.log("Uploading file to GitHub repository...");
     const uploadRes = await fetch(contentUrl, {
       method: "PUT",
       headers,
       body: JSON.stringify({
         message: `[Server API] Sync at ${new Date().toISOString()}`,
-        content: cleanBase64, // <-- Update this property name to use the sanitized variable
-        sha: sha || undefined,
+        content: cleanBase64, // <-- Ensure this is changed from imageBase64 to cleanBase64
         branch: "main"
       })
     });
+
 
     if (!uploadRes.ok) {
       const errText = await uploadRes.text();
