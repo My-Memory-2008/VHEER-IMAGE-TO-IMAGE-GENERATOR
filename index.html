@@ -537,7 +537,7 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 uploadedImageDataUrl = e.target.result; // Full data URL with header
-                uploadedImage = e.target.result.split(',')[1]; // Base64 only
+                uploadedImage = e.target.result.split(',')[1];
                 
                 // Show preview
                 document.getElementById("previewImage").src = uploadedImageDataUrl;
