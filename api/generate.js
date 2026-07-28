@@ -466,13 +466,13 @@ export default async function handler(req, res) {
   cleanBase64 = cleanBase64.replace(/^data:image\/[a-z]+;base64,/, "").replace(/\s/g, '');
 
   // 2. Set up correct GitHub REST Headers
-  const headers = {
-    "Authorization": `Bearer ${token}`,
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
+    const headers = {
+    "Authorization": `token ${token}`, // Some GitHub endpoints strictly expect 'token' instead of 'Bearer'
+    "Accept": "application/vnd.github.v3+json",
     "User-Agent": "Vheer-AI-Web-Gateway",
     "Content-Type": "application/json"
   };
+
 
   try {
     const triggerTime = new Date().toISOString();
