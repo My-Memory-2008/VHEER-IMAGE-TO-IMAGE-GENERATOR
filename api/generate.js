@@ -442,21 +442,22 @@ const REPO_OWNER = "My-Memory-2008";
 const REPO_NAME = "VHEER-IMAGE-TO-IMAGE-GENERATOR";
 
 export default async function handler(req, res) {
+  // Allow only POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
-    return res.status(500).json({ error: 'Server configuration missing: GITHUB_TOKEN variable not found.' });
+    return res.status(500).json({ error: 'Server authentication configuration missing.' });
   }
 
   const { imageBase64, prompt } = req.body;
   if (!imageBase64 || !prompt) {
-    return res.status(400).json({ error: 'Missing imageBase64 or prompt payload' });
+    return res.status(400).json({ error: 'Missing parameters' });
   }
 
-  // 1. Clean the Base64 data down to a pure string
+  // Pure Base64 Character Extractor Guardrail
   let cleanBase64 = imageBase64;
   if (Array.isArray(cleanBase64)) {
     cleanBase64 = cleanBase64[cleanBase64.length - 1];
@@ -465,27 +466,24 @@ export default async function handler(req, res) {
   }
   cleanBase64 = cleanBase64.replace(/^data:image\/[a-z]+;base64,/, "").replace(/\s/g, '');
 
-  // 2. Set up correct GitHub REST Headers
-    const headers = {
-    "Authorization": `token ${token}`, // Some GitHub endpoints strictly expect 'token' instead of 'Bearer'
+  // Exact standard request headers for Repository Dispatches
+  const headers = {
+    "Authorization": `token ${token}`,
     "Accept": "application/vnd.github.v3+json",
-    "User-Agent": "Vheer-AI-Web-Gateway",
+    "User-Agent": "Vheer-AI-Client-Engine",
     "Content-Type": "application/json"
   };
 
+  const dispatchUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/dispatches`;
 
   try {
-    const triggerTime = new Date().toISOString();
-
-    // 3. Trigger Repository Dispatch (Matches your web_ui_upload type)
     console.log("Dispatching payload directly to web_ui_upload event...");
-    const dispatchUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/dispatches`;
     
-    const dispatchRes = await fetch(dispatchUrl, {
+    const response = await fetch(dispatchUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        event_type: "web_ui_upload", // Matches your vheer.yml exactly!
+        event_type: "web_ui_upload",
         client_payload: {
           image: cleanBase64,
           prompt: prompt
@@ -493,61 +491,17 @@ export default async function handler(req, res) {
       })
     });
 
-    if (dispatchRes.status !== 204 && dispatchRes.status !== 200) {
-      const errText = await dispatchRes.text();
-      throw new Error(`Repository dispatch failed (${dispatchRes.status}): ${errText}`);
-    }
-    console.log("Dispatch successful! GitHub Action has been triggered.");
-
-    // 4. Poll for the running workflow execution
-    const runsUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs`;
-    let completedRunId = null;
-    
-    console.log("Polling workflow execution status...");
-    // Loops 36 times (every 5 seconds) max 3 minutes execution
-    for (let i = 0; i < 36; i++) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      const runsRes = await fetch(runsUrl, { headers });
-      if (!runsRes.ok) continue;
-      
-      const runsData = await runsRes.json();
-      // Look for the workflow run triggered by the dispatch event
-      const recentRun = runsData.workflow_runs.find(
-        run => run.event === "repository_dispatch" && new Date(run.created_at) >= new Date(triggerTime)
-      );
-
-      if (recentRun && recentRun.status === "completed") {
-        if (recentRun.conclusion === "success") {
-          completedRunId = recentRun.id;
-          break;
-        } else {
-          throw new Error(`GitHub Action run completed with failure status: ${recentRun.conclusion}`);
-        }
-      }
+    if (response.status !== 204 && response.status !== 200) {
+      const errText = await response.text();
+      throw new Error(`GitHub Dispatches API rejected request (${response.status}): ${errText.substring(0, 100)}`);
     }
 
-    if (!completedRunId) throw new Error("GitHub generation sequence timed out.");
-
-    // 5. Download the final output artifact archive package
-    console.log(`Workflow complete (ID: ${completedRunId}). Fetching output artifacts...`);
-    const artifactUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs/${completedRunId}/artifacts`;
-    const artifactRes = await fetch(artifactUrl, { headers });
-    const artifactData = await artifactRes.json();
-    
-    if (!artifactData.artifacts || artifactData.artifacts.length === 0) {
-      throw new Error("No artifacts found for this generation run. Make sure files are saved to output/");
-    }
-
-    // Fetch the zip URL using the artifact ID
-    const targetArtifactId = artifactData.artifacts[0].id;
-    const zipUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifactId}/zip`;
-    
-    console.log("Downloading generated output archive from GitHub...");
-    const zipFileRes = await fetch(zipUrl, { headers });
-    const arrayBuffer = await zipFileRes.arrayBuffer();
-    const base64Zip = Buffer.from(arrayBuffer).toString('base64');
-
-    return res.status(200).json({ zipArchive: base64Zip });
+    // Success! Return immediately to client to bypass Vercel serverless timeouts
+    return res.status(200).json({ 
+      success: true, 
+      message: "Pipeline successfully triggered on GitHub automation layer.",
+      timestamp: new Date().toISOString()
+    });
 
   } catch (error) {
     console.error("RUNTIME PIPELINE CRASH:", error.message);
