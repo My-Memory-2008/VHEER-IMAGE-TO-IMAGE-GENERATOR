@@ -1,4 +1,6 @@
-<html lang="en"><head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vheer AI Image Generator</title>
@@ -384,6 +386,9 @@
             </div>
         </div>
 
+        <!-- Error Panel (at top so it's always visible) -->
+        <div class="error-message hidden" id="errorPanel"></div>
+
         <!-- Main Panel -->
         <div class="card" id="inputPanel">
             <h2>Image Transformation</h2>
@@ -396,7 +401,7 @@
 
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
                 <div class="upload-icon">📷</div>
-                <div class="upload-text">Click to upload or drag &amp; drop</div>
+                <div class="upload-text">Click to upload or drag & drop</div>
                 <div class="upload-hint">Supports JPG, PNG, WebP (Max 10MB)</div>
                 <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
             </div>
@@ -411,7 +416,7 @@
                 ✓ <span id="fileNameText"></span>
             </div>
 
-            <button class="btn-primary" id="generateBtn" onclick="startGeneration()" disabled="">
+            <button class="btn-primary" id="generateBtn" onclick="startGeneration()" disabled>
                 🚀 Generate Image
             </button>
         </div>
@@ -440,9 +445,6 @@
                 <button class="btn-secondary" onclick="resetUI()">✎ Another Image</button>
             </div>
         </div>
-
-        <!-- Error Panel -->
-        <div class="error-message hidden" id="errorPanel"></div>
     </div>
 
     <script>
@@ -680,12 +682,13 @@
             const panel = document.getElementById("errorPanel");
             panel.textContent = "⚠ " + message;
             panel.classList.remove("hidden");
+            console.error("VHEER ERROR:", message);
+            window.scrollTo(0, 0);
         }
 
         function clearError() {
             document.getElementById("errorPanel").classList.add("hidden");
         }
     </script>
-
-
-</body></html>
+</body>
+</html>
