@@ -558,24 +558,31 @@
             showProcessing();
             
             try {
+                alert("Step 1: Starting compression");
                 updateProgress(5, "Compressing image...");
                 const compressedDataUrl = await compressImage(uploadedImageDataUrl);
+                alert("Step 2: Compression done, base64 length: " + compressedDataUrl.length);
                 const compressedBase64 = compressedDataUrl.split(",")[1];
                 
                 updateProgress(15, "Uploading image...");
+                alert("Step 3: Calling /api/generate");
                 const res = await fetch("/api/generate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action: "start", image: compressedBase64, prompt: prompt }),
                 });
+                alert("Step 4: Got response status " + res.status);
                 if (!res.ok) throw new Error("Server error (" + res.status + ")");
                 const data = await res.json();
+                alert("Step 5: Response: " + JSON.stringify(data).substring(0, 200));
                 if (!data.ok) throw new Error(data.error || "Failed to start generation");
 
                 currentTriggerTime = data.triggerTime;
                 updateProgress(35, "Workflow dispatched. Generating...");
+                alert("Step 6: Starting to poll");
                 startPolling();
             } catch (error) {
+                alert("CAUGHT ERROR: " + error.message + "\n\nStack: " + error.stack);
                 console.error("Generation error:", error);
                 showError(error.message || "Something went wrong. Please try again.");
                 document.getElementById("processingPanel").classList.add("hidden");
