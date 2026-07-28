@@ -603,19 +603,11 @@
   console.log("Generation process started.");
   const prompt = document.getElementById("promptInput").value.trim();
   
-  // Auto-detect which image variable your file layout is using
-  let targetImageBase64 = null;
+  // 1. Grab the file selector element directly from your HTML layout
+  // (Change "fileInput" to "imageInput" below if your HTML tag uses id="imageInput")
+  const fileSelector = document.getElementById("fileInput") || document.getElementById("imageInput");
   
-  if (typeof uploadedImage !== 'undefined' && uploadedImage) {
-    targetImageBase64 = uploadedImage;
-  } else if (typeof uploadedImageDataUrl !== 'undefined' && uploadedImageDataUrl) {
-    targetImageBase64 = uploadedImageDataUrl;
-  } else if (typeof currentImageBase64 !== 'undefined' && currentImageBase64) {
-    targetImageBase64 = currentImageBase64;
-  }
-
-  // If no image data is loaded in any format, display a frontend prompt error
-  if (!targetImageBase64) { 
+  if (!fileSelector || !fileSelector.files || fileSelector.files.length === 0) {
     showError("Please pick or upload a source image first.");
     return;
   }
@@ -624,35 +616,52 @@
     return;
   }
 
+  const selectedFile = fileSelector.files[0];
+
   clearError();
   showProcessing();
+  updateProgress(10, "Reading your image file...");
 
-  try {
-    updateProgress(20, "Packaging file asset matrix and relaying securely...");
+  // 2. Read the file into Base64 format right here on the spot
+  const reader = new FileReader();
+  reader.readAsDataURL(selectedFile);
+  
+  reader.onload = async function () {
+    const base64DataUrl = reader.result;
 
-    // Send payload directly to your Vercel Proxy
-    const response = await fetch(CONFIG.API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        image: targetImageBase64, 
-        prompt: prompt
-      })
-    });
+    try {
+      updateProgress(30, "Packaging image data and relaying securely...");
 
-    const resultData = await response.json();
-    if (!response.ok) throw new Error(resultData.error || "Upstream backend error encountered.");
+      // 3. Send the freshly read data straight to your Vercel Proxy
+      const response = await fetch(CONFIG.API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: base64DataUrl, 
+          prompt: prompt
+        })
+      });
 
-    updateProgress(50, "Remote workflow execution synchronized successfully. Tracking runner runtime...");
-    
-    // Begin your checking tracking loop
-    await pollWorkflowWithoutToken();
+      const resultData = await response.json();
+      if (!response.ok) throw new Error(resultData.error || "Upstream backend error encountered.");
 
-  } catch (error) {
-    console.error("Pipeline failure context details:", error);
-    showError(error.message);
+      updateProgress(50, "Remote workflow execution synchronized successfully. Tracking runtime...");
+      
+      // Begin your checking tracking loop
+      await pollWorkflowWithoutToken();
+
+    } catch (error) {
+      console.error("Pipeline failure context details:", error);
+      showError(error.message);
+      resetUI();
+    }
+  };
+
+  reader.onerror = function (error) {
+    console.error("Error reading file:", error);
+    showError("Failed to read the image file from your device.");
     resetUI();
-  }
+  };
 }
 
 
