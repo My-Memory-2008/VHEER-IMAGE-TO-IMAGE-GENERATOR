@@ -435,8 +435,7 @@
                 <div class="upload-icon">📷</div>
                 <div class="upload-text">Click to upload or drag & drop</div>
                 <div class="upload-hint">Supports JPG, PNG, WebP (Max 10MB)</div>
-                <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
-
+                <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
             </div>
 
             <!-- Image Preview Container -->
@@ -510,37 +509,18 @@
         // ============================================================================
         // Token Management
         // ============================================================================
-        function clearToken() {
-            localStorage.removeItem(CONFIG.TOKEN_KEY);
-            updateTokenStatus();
-            alert("Token cleared successfully");
+        function checkTokenConfigured() {
+          // We no longer manage local tokens because Vercel handles this on the backend!
+          const statusEl = document.getElementById("tokenStatus");
+          if (statusEl) {
+            statusEl.innerHTML = `
+              <span class="token-status">
+                <span class="token-dot"></span>
+                Secure Server Authentication Active
+              </span>
+            `;
+          }
         }
-
-        function updateTokenStatus() {
-            const token = localStorage.getItem(CONFIG.TOKEN_KEY);
-            const statusEl = document.getElementById("tokenStatus");
-            if (token) {
-                statusEl.innerHTML = `
-                    <span class="token-status">
-                        <span class="token-dot"></span>
-                        Token: ${token.substring(0, 10)}...
-                    </span>
-                `;
-            } else {
-                statusEl.innerHTML = `
-                    <span class="token-status">
-                        <span class="token-dot" style="background: #ef4444;"></span>
-                        Token not configured
-                    </span>
-                `;
-            }
-        }
-
-        async function getToken() {
-  // Token prompt removed entirely for anonymous public access
-  return "TOKEN_NOT_NEEDED_ON_FRONTEND";
-}
-
 
         // ============================================================================
         // File Handling
@@ -593,205 +573,65 @@
         // ============================================================================
         // Generation Pipeline
         // ============================================================================
-        // Configuration Setup
-
-        const CONFIG = {
-  // REMOVE: REPO_OWNER, REPO_NAME, and TOKEN_KEY
-  API_URL: "https://vheer-image-to-image-generator-ftncpq1c7-awram-s-projects.vercel.app" // <-- Add your Vercel URL here
-};
         async function startGeneration() {
-  console.log("Generation process started.");
-  const prompt = document.getElementById("promptInput").value.trim();
-  
-  // 1. Grab the file selector element directly from your HTML layout
-  // (Change "fileInput" to "imageInput" below if your HTML tag uses id="imageInput")
-  const fileSelector = document.getElementById("fileInput") || document.getElementById("imageInput");
-  
-  if (!fileSelector || !fileSelector.files || fileSelector.files.length === 0) {
-    showError("Please pick or upload a source image first.");
-    return;
-  }
-  if (!prompt) {
-    showError("Please enter an image modification prompt.");
-    return;
-  }
-
-  const selectedFile = fileSelector.files[0];
-
-  clearError();
-  showProcessing();
-  updateProgress(10, "Reading your image file...");
-
-  // 2. Read the file into Base64 format right here on the spot
-  const reader = new FileReader();
-  reader.readAsDataURL(selectedFile);
-  
-  reader.onload = async function () {
-    const base64DataUrl = reader.result;
-
-    try {
-      updateProgress(30, "Packaging image data and relaying securely...");
-
-      // 3. Send the freshly read data straight to your Vercel Proxy
-      const response = await fetch(CONFIG.API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: base64DataUrl, 
-          prompt: prompt
-        })
-      });
-
-      const resultData = await response.json();
-      if (!response.ok) throw new Error(resultData.error || "Upstream backend error encountered.");
-
-      updateProgress(50, "Remote workflow execution synchronized successfully. Tracking runtime...");
-      
-      // Begin your checking tracking loop
-      await pollWorkflowWithoutToken();
-
-    } catch (error) {
-      console.error("Pipeline failure context details:", error);
-      showError(error.message);
-      resetUI();
-    }
-  };
-
-  reader.onerror = function (error) {
-    console.error("Error reading file:", error);
-    showError("Failed to read the image file from your device.");
-    resetUI();
-  };
-}
-
-
-
-// Clear token placeholder function to prevent breaking older function calls
-
-
-
-        
-  async function pollWorkflowWithoutToken() {
-  const REPO_OWNER = "My-Memory-2008";
-  const REPO_NAME = "VHEER-IMAGE-TO-IMAGE-GENERATOR";
-  
-  // Use public unauthenticated API endpoints to monitor progress loops
-  const checkUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs?event=repository_dispatch&per_page=1`;
-  
-  let attempts = 0;
-  const maxAttempts = 30; // Check for up to 5 minutes
-
-  const interval = setInterval(async () => {
-    attempts++;
-    if (attempts > maxAttempts) {
-      clearInterval(interval);
-      showError("The generation pipeline processing window timed out.");
-      resetUI();
-      return;
-    }
-
-    try {
-      const res = await fetch(checkUrl);
-      if (!res.ok) return; // Keep trying quietly if hit by temporary public network traffic caps
-      
-      const data = await res.json();
-      const latestRun = data.workflow_runs[0];
-
-      if (latestRun) {
-        if (latestRun.status === "completed") {
-          clearInterval(interval);
-          if (latestRun.conclusion === "success") {
-            updateProgress(90, "Processing complete! Loading output results...");
-            // Call your existing function to fetch and view the artifact output images here
-            await fetchOutputArtifact(latestRun.id); 
-          } else {
-            showError("The workflow execution pipeline finished with errors.");
-            resetUI();
+          console.log("Generate button clicked");
+          const prompt = document.getElementById("promptInput").value.trim();
+          
+          if (!uploadedImage) {
+            showError("Please select an image");
+            return;
           }
-        } else {
-          updateProgress(65, `AI Generation Engine running... (Status: ${latestRun.status})`);
-        }
-      }
-    } catch (e) {
-      console.warn("Polling request dropped temporarily: ", e);
-    }
-  }, 10000); // Check every 10 seconds
-}
-        async function pollWorkflow(token, triggerTime) {
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json"
-            };
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs`;
-
-            let progress = 50;
-            const pollInterval = setInterval(async () => {
-                try {
-                    // Simulate progress
-                    if (progress < 85) {
-                        progress += Math.random() * 8;
-                        updateProgress(Math.min(progress, 85), "Generating image...");
-                    }
-
-                    const res = await fetch(url, { headers });
-                    if (!res.ok) return;
-
-                    const data = await res.json();
-                    const recentRun = data.workflow_runs.find(
-                        run => new Date(run.created_at) >= new Date(triggerTime)
-                    );
-
-                    if (recentRun && recentRun.status === "completed") {
-                        clearInterval(pollInterval);
-
-                        if (recentRun.conclusion === "success") {
-                            updateProgress(95, "Fetching result...");
-                            await fetchArtifact(token, recentRun.id);
-                        } else {
-                            throw new Error("Workflow failed. Check the workflow logs for details.");
-                        }
-                    }
-                } catch (error) {
-                    clearInterval(pollInterval);
-                    throw error;
-                }
-            }, 5000);
-        }
-
-        async function fetchArtifact(token, runId) {
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json"
-            };
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs/${runId}/artifacts`;
-
-            const res = await fetch(url, { headers });
-            if (!res.ok) throw new Error("Failed to fetch artifacts");
-
-            const data = await res.json();
-            if (!data.artifacts || data.artifacts.length === 0) {
-                throw new Error("No artifacts found");
+          if (!prompt) {
+            showError("Please enter a prompt");
+            return;
+          }
+        
+          clearError();
+          showProcessing();
+          updateProgress(15, "Sending image processing request to secure backend...");
+        
+          try {
+            // Call the Vercel backend serverless function
+            const response = await fetch('/api/generate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                imageBase64: uploadedImage,
+                prompt: prompt
+              })
+            });
+        
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Server pipeline processing failed.');
             }
-
-            const artifact = data.artifacts[0];
-            const zipUrl = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/artifacts/${artifact.id}/zip`;
-
-            updateProgress(98, "Extracting image...");
-            const zipRes = await fetch(zipUrl, { headers });
-            const blob = await zipRes.blob();
-
-            const zip = await JSZip.loadAsync(blob);
+        
+            updateProgress(90, "Extracting received image package...");
+            const data = await response.json();
+        
+            // Reconstruct the ZIP archive blob from the server response
+            const zipBlob = await (await fetch(`data:application/zip;base64,${data.zipArchive}`)).blob();
+            const zip = await JSZip.loadAsync(zipBlob);
+            
             const imageFile = Object.keys(zip.files).find(
-                name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')
+              name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')
             );
-
-            if (!imageFile) throw new Error("No image found in artifact");
-
+        
+            if (!imageFile) throw new Error("No processed image found in returned archive");
+        
             const imageBlob = await zip.files[imageFile].async("blob");
             currentResultUrl = URL.createObjectURL(imageBlob);
-
+            
             updateProgress(100, "Done!");
             setTimeout(showResult, 500);
+        
+          } catch (error) {
+            console.error("Pipeline error:", error);
+            showError(error.message);
+            resetUI();
+          }
         }
 
         // ============================================================================
@@ -850,7 +690,7 @@
         }
 
         // Initialize
-        updateTokenStatus();
+        checkTokenConfigured();
         console.log("Page loaded - workflow file:", CONFIG.WORKFLOW_FILE);
     </script>
 </body>
