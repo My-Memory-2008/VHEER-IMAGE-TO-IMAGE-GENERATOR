@@ -614,12 +614,11 @@
         return;
     }
 
-    // REMOVED: No more calling getToken() or checking browser memory strings
     clearError();
     showProcessing();
     
     try {
-        // Change this URL string to match your live Vercel production address once deployed!
+        // Change this URL string to match your live Vercel production deployment app address!
         const PROXY_SERVERLESS_API = "https://YOUR_VERCEL_PROJECT_NAME.vercel.app/api/generate";
         
         updateProgress(15, "Routing payload directly to serverless api proxy...");
@@ -629,25 +628,26 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 prompt: prompt,
-                image_base64: uploadedImage // This is your pre-split pure Base64 code string block
+                image_base64: uploadedImage 
             })
         });
 
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Server connection dropped during upload handoff.");
 
-        updateProgress(35, "Pipeline successfully engaged...");
+        updateProgress(35, "Pipeline successfully engaged... Initializing tracking checks.");
         
-        // Pass control to your active artifact polling tracker framework using returned tokenless logs data
-        pollWorkflowStatus(null, data.trigger_time);
+        // FIXED: Feeds the temp_access authorization signature key into your tracking parameters 
+        // to prevent pollWorkflowStatus from breaking and calling resetUI()
+        pollWorkflowStatus(data.temp_access, data.trigger_time);
 
     } catch (error) {
         console.error("Pipeline error:", error);
         showError(error.message);
-        resetUI();
+        // If your page template provides resetUI(), it executes safely inside standard catch frameworks
+        if (typeof resetUI === 'function') resetUI();
     }
 }
-
 
         // async function uploadImage(token, prompt) {
         //     updateProgress(15, "Uploading image to repository...");
