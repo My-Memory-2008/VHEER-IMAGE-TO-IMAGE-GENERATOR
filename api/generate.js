@@ -144,6 +144,15 @@ export default async function handler(req, res) {
     "User-Agent": "Vercel-Serverless-Function"
   };
 
+
+    // Extract only raw Base64 characters if a data URL prefix is present
+  let cleanBase64 = imageBase64;
+  if (cleanBase64.includes(',')) {
+    cleanBase64 = cleanBase64.split(',')[1];
+  }
+  // Strip out any accidental newline strings or spaces
+  cleanBase64 = cleanBase64.replace(/\s/g, '');
+
   try {
     console.log("Pipeline started. checking if old input-image exists...");
     
@@ -162,11 +171,12 @@ export default async function handler(req, res) {
       headers,
       body: JSON.stringify({
         message: `[Server API] Sync at ${new Date().toISOString()}`,
-        content: imageBase64,
+        content: cleanBase64, // <-- Update this property name to use the sanitized variable
         sha: sha || undefined,
         branch: "main"
       })
     });
+
     if (!uploadRes.ok) {
       const errText = await uploadRes.text();
       throw new Error(`GitHub Upload failed: ${errText}`);
