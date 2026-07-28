@@ -574,65 +574,94 @@
         // Generation Pipeline
         // ============================================================================
         async function startGeneration() {
-          console.log("Generate button clicked");
-          const prompt = document.getElementById("promptInput").value.trim();
-          
-          if (!uploadedImage) {
-            showError("Please select an image");
-            return;
-          }
-          if (!prompt) {
-            showError("Please enter a prompt");
-            return;
-          }
+  const prompt = document.getElementById("promptInput").value.trim();
+  if (!uploadedImage) { showError("Please select an image"); return; }
+  if (!prompt) { showError("Please enter a prompt"); return; }
+  
+  clearError();
+  showProcessing();
+  updateProgress(10, "Triggering secure serverless runtime dispatch...");
+
+  try {
+    const triggerTime = new Date().toISOString();
+    
+    // 1. Kick off the pipeline via Vercel Function
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: uploadedImage, prompt: prompt })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Server rejected trigger sequence.');
+    }
+    
+    updateProgress(25, "Job accepted by GitHub. Waiting for automation container to boot...");
+
+    // 2. Poll for workflow completion directly from the browser!
+    const REPO_OWNER = "My-Memory-2008";
+    const REPO_NAME = "VHEER-IMAGE-TO-IMAGE-GENERATOR";
+    let completedRunId = null;
+
+    // Loop for 5 minutes max (60 iterations * 5 seconds)
+    for (let i = 0; i < 60; i++) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      updateProgress(25 + (i * 0.8), `Processing execution tree... (Step ${i+1}/60)`);
+
+      try {
+        // Fetch run history publicly (No token required for public repositories!)
+        const runsRes = await fetch(`https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs`);
+        if (!runsRes.ok) continue;
         
-          clearError();
-          showProcessing();
-          updateProgress(15, "Sending image processing request to secure backend...");
-        
-          try {
-            // Call the Vercel backend serverless function
-            const response = await fetch('/api/generate', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                imageBase64: uploadedImage,
-                prompt: prompt
-              })
-            });
-        
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'Server pipeline processing failed.');
-            }
-        
-            updateProgress(90, "Extracting received image package...");
-            const data = await response.json();
-        
-            // Reconstruct the ZIP archive blob from the server response
-            const zipBlob = await (await fetch(`data:application/zip;base64,${data.zipArchive}`)).blob();
-            const zip = await JSZip.loadAsync(zipBlob);
-            
-            const imageFile = Object.keys(zip.files).find(
-              name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')
-            );
-        
-            if (!imageFile) throw new Error("No processed image found in returned archive");
-        
-            const imageBlob = await zip.files[imageFile].async("blob");
-            currentResultUrl = URL.createObjectURL(imageBlob);
-            
-            updateProgress(100, "Done!");
-            setTimeout(showResult, 500);
-        
-          } catch (error) {
-            console.error("Pipeline error:", error);
-            showError(error.message);
-            resetUI();
+        const runsData = await runsRes.json();
+        const recentRun = runsData.workflow_runs.find(
+          run => run.event === "repository_dispatch" && new Date(run.created_at) >= new Date(triggerTime)
+        );
+
+        if (recentRun && recentRun.status === "completed") {
+          if (recentRun.conclusion === "success") {
+            completedRunId = recentRun.id;
+            break;
+          } else {
+            throw new Error(`GitHub Pipeline finished with conclusion: ${recentRun.conclusion}`);
           }
         }
+      } catch (pollErr) {
+        console.warn("Polling error segment: ", pollErr);
+      }
+    }
+
+    if (!completedRunId) throw new Error("Processing sequence timed out on server cluster.");
+
+    updateProgress(90, "Downloading generated artifact archive package...");
+
+    // 3. Request final zip download URL path
+    const artifactRes = await fetch(`https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs/${completedRunId}/artifacts`);
+    const artifactData = await artifactRes.json();
+    if (!artifactData.artifacts || artifactData.artifacts.length === 0) {
+      throw new Error("Pipeline run complete, but no output image files were exported.");
+    }
+
+    const targetArtifactId = artifactData.artifacts[0].id;
+    
+    // Redirect browser window to download artifact directly or via public proxy link
+    updateProgress(95, "Extracting artifact stream...");
+    
+    // Since download artifact binaries requires auth token from browser, we fallback to public zip or display action path link
+    const zipUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifactId}/zip`;
+    
+    // Direct user to open or read target artifact files layout
+    showError(`Processing complete! Your browser will now open the download package layout framework.`);
+    window.open(`https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs/${completedRunId}`, '_blank');
+    resetUI();
+
+  } catch (error) {
+    console.error("Browser pipeline error:", error);
+    showError(error.message);
+    resetUI();
+  }
+}
 
         // ============================================================================
         // UI Updates
