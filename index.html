@@ -415,11 +415,16 @@
 
         <!-- Main Panel -->
         <div class="card" id="inputPanel">
-            
+            <button class="btn-small btn-danger" onclick="clearToken()">Clear Token</button>
             <h2>Image Transformation</h2>
             <p class="card-description">Upload an image and describe the transformation you want</p>
 
-            
+            <div class="token-manager" id="tokenStatus">
+                <span class="token-status">
+                    <span class="token-dot"></span>
+                    Token not configured
+                </span>
+            </div>
 
             <div class="form-group">
                 <label for="promptInput">Transformation Prompt</label>
@@ -530,7 +535,11 @@
             }
         }
 
-        
+        async function getToken() {
+  // Token prompt removed entirely for anonymous public access
+  return "TOKEN_NOT_NEEDED_ON_FRONTEND";
+}
+
 
         // ============================================================================
         // File Handling
@@ -583,20 +592,23 @@
         // ============================================================================
         // Generation Pipeline
         // ============================================================================
-        // 1. Force the client to look at the Vercel URL endpoint instead of hitting GitHub directly
-        const VERCEL_API_URL = "https://vheer-image-to-image-generator-lx3d5e5ov-awram-s-projects.vercel.app/"; 
-        
-        // 2. Modified tokenless frontend initialization method
+        // Configuration Setup
+
+        const CONFIG = {
+  // REMOVE: REPO_OWNER, REPO_NAME, and TOKEN_KEY
+  API_URL: "https://vheer-image-to-image-generator-ftncpq1c7-awram-s-projects.vercel.app" // <-- Add your Vercel URL here
+};
         async function startGeneration() {
-  console.log("Generate button clicked");
+  console.log("Generation initialization hooks triggered.");
   const prompt = document.getElementById("promptInput").value.trim();
   
-  if (!uploadedImageDataUrl) { // Use the variable holding your base64 string
-    showError("Please select an image");
+  // Make sure this matches your variable name holding the raw Base64 string data
+  if (!uploadedImage) { 
+    showError("Please pick a source file asset first.");
     return;
   }
   if (!prompt) {
-    showError("Please enter a prompt");
+    showError("Please draft a generative text target modification prompt.");
     return;
   }
 
@@ -604,68 +616,85 @@
   showProcessing();
 
   try {
-    updateProgress(15, "Uploading image securely via backend server...");
-    
-    // Remote payload submission to Vercel
-    const response = await fetch(VERCEL_API_URL, {
+    updateProgress(20, "Packaging file asset matrix and relaying securely...");
+
+    // Send payload directly to Vercel (Vercel uses your hidden token to talk to GitHub)
+    const response = await fetch(CONFIG.API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        image: uploadedImageDataUrl, 
+        image: uploadedImage, 
         prompt: prompt
       })
     });
 
     const resultData = await response.json();
-    if (!response.ok) throw new Error(resultData.error || "Server processing failed.");
+    if (!response.ok) throw new Error(resultData.error || "Upstream server error encountered.");
 
-    updateProgress(50, "Waiting for workflow pipeline execution...");
+    updateProgress(50, "Remote workflow execution synchronized successfully. Simulating engine run tracking...");
     
-    // Continue loop checking for execution status
-    // Note: Since public visitors don't have tokens, pollWorkflow must run directly 
-    // using an unauthenticated public runtime call or a dedicated status endpoint.
-    await pollWorkflowWithoutToken(resultData.triggerTime);
+    // Call your checking loop safely without token validations
+    await pollWorkflowWithoutToken();
 
   } catch (error) {
-    console.error("Pipeline failure context:", error);
+    console.error("Pipeline breakdown trace context:", error);
     showError(error.message);
     resetUI();
   }
 }
 
-// 3. Keep getToken dummy placeholder clean so it never prompts your user again
-async function getToken() {
-  return "TOKEN_NOT_NEEDED_ON_FRONTEND";
-}
+
+// Clear token placeholder function to prevent breaking older function calls
+
+
 
         
+  async function pollWorkflowWithoutToken() {
+  const REPO_OWNER = "My-Memory-2008";
+  const REPO_NAME = "VHEER-IMAGE-TO-IMAGE-GENERATOR";
+  
+  // Use public unauthenticated API endpoints to monitor progress loops
+  const checkUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs?event=repository_dispatch&per_page=1`;
+  
+  let attempts = 0;
+  const maxAttempts = 30; // Check for up to 5 minutes
 
-        async function dispatchWorkflow(token, prompt, triggerTime) {
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
-            console.log("Dispatching workflow to:", url);
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
+  const interval = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts) {
+      clearInterval(interval);
+      showError("The generation pipeline processing window timed out.");
+      resetUI();
+      return;
+    }
 
-            const res = await fetch(url, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ ref: "main", inputs: { prompt } })
-            });
+    try {
+      const res = await fetch(checkUrl);
+      if (!res.ok) return; // Keep trying quietly if hit by temporary public network traffic caps
+      
+      const data = await res.json();
+      const latestRun = data.workflow_runs[0];
 
-            console.log("Dispatch response status:", res.status);
-            if (res.status !== 204 && res.status !== 200) {
-                const errText = await res.text();
-                console.error("Dispatch error:", errText);
-                throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
-            }
-
-            updateProgress(50, "Waiting for workflow to complete...");
-            await pollWorkflow(token, triggerTime);
+      if (latestRun) {
+        if (latestRun.status === "completed") {
+          clearInterval(interval);
+          if (latestRun.conclusion === "success") {
+            updateProgress(90, "Processing complete! Loading output results...");
+            // Call your existing function to fetch and view the artifact output images here
+            await fetchOutputArtifact(latestRun.id); 
+          } else {
+            showError("The workflow execution pipeline finished with errors.");
+            resetUI();
+          }
+        } else {
+          updateProgress(65, `AI Generation Engine running... (Status: ${latestRun.status})`);
         }
-
+      }
+    } catch (e) {
+      console.warn("Polling request dropped temporarily: ", e);
+    }
+  }, 10000); // Check every 10 seconds
+}
         async function pollWorkflow(token, triggerTime) {
             const headers = {
                 "Authorization": `token ${token}`,
