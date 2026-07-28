@@ -2,7 +2,7 @@
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
-    // 1. Enforce CORS protection and allow incoming payloads
+    // 1. Establish browser-safe CORS allowances to accept remote payloads
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -12,20 +12,20 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+        return res.status(405).json({ error: 'Method not allowed. Use POST payload formats.' });
     }
 
     try {
         const { prompt, image_base64 } = req.body;
         
-        // Securely fetch your GitHub token from the hosted environment variables
+        // Pull hidden backend parameters safely out of server hardware settings configurations
         const GH_TOKEN = process.env.GH_TOKEN;
-        const REPO_OWNER = process.env.REPO_OWNER;
-        const REPO_NAME = process.env.REPO_NAME;
-        const WORKFLOW_FILE = "vheer_runner.yml";
+        const REPO_OWNER = process.env.REPO_OWNER || "My-Memory-2008";
+        const REPO_NAME = process.env.REPO_NAME || "VHEER-IMAGE-TO-IMAGE-GENERATOR";
+        const WORKFLOW_FILE = "vheer.yml";
 
         if (!prompt || !image_base64) {
-            return res.status(400).json({ error: 'Missing prompt or image data components.' });
+            return res.status(400).json({ error: 'Missing prompt or image content arrays data profiles.' });
         }
 
         const headers = {
@@ -34,8 +34,8 @@ export default async function handler(req, res) {
             "Content-Type": "application/json"
         };
 
-        // A. Upload and overwrite 'input-image.png' in the repo
-        const uploadUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
+        // A. Overwrite input-image.png in your repository securely
+        const uploadUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/input-image.png`;
         const checkRes = await fetch(uploadUrl, { headers });
         let sha = null;
         if (checkRes.status === 200) {
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
             method: "PUT",
             headers,
             body: JSON.stringify({
-                message: "API Gateway Proxy Automated Upload",
+                message: `[API Proxy Upload] Generated at ${new Date().toISOString()}`,
                 content: image_base64,
                 sha: sha || undefined,
                 branch: "main"
@@ -59,9 +59,9 @@ export default async function handler(req, res) {
             throw new Error(`GitHub File Staging Error: ${errText}`);
         }
 
-        // B. Trigger the GitHub Actions Workflow
+        // B. Dispatch your vheer.yml workflow loop
         const triggerTime = new Date().toISOString();
-        const dispatchUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+        const dispatchUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
         
         const dispatchRes = await fetch(dispatchUrl, {
             method: "POST",
@@ -71,20 +71,12 @@ export default async function handler(req, res) {
 
         if (dispatchRes.status !== 204 && dispatchRes.status !== 200) {
             const errText = await dispatchRes.text();
-            throw new Error(`GitHub Workflow Activation Error: ${errText}`);
+            throw new Error(`GitHub Action Dispatch Error: ${errText}`);
         }
-
-        // C. Fetch the immediate run logs to send back a tracking tracker ID
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        const runsUrl = `https://github.com{REPO_OWNER}/${REPO_NAME}/actions/runs?event=workflow_dispatch`;
-        const runsRes = await fetch(runsUrl, { headers });
-        const runsData = await runsRes.json();
-        const activeRun = runsData.workflow_runs.find(run => new Date(run.created_at) >= new Date(triggerTime));
 
         return res.status(200).json({
             success: true,
-            message: "Automation engine initialized successfully.",
-            run_id: activeRun ? activeRun.id : null,
+            message: "Cloud automation successfully engaged.",
             trigger_time: triggerTime
         });
 
