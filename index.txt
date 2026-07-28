@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vheer AI Image Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg) 0%, #1a1f3a 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--success);
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.1);
+        }
+
+        .card h2 {
+            font-size: 22px;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .card-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: var(--text);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            background: rgba(37, 99, 235, 0.05);
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .upload-zone.dragging {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .upload-text {
+            color: var(--text);
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .upload-hint {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .preview-container {
+            display: none;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+        }
+
+        .preview-container.show {
+            display: block;
+        }
+
+        .preview-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            grid-column: span 2;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: var(--border);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--border);
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 12px;
+            float: right;
+            margin-bottom: 15px;
+        }
+
+        .progress-container {
+            margin-top: 20px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--bg);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--success));
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .progress-text {
+            font-size: 13px;
+            color: var(--success);
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .status-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .result-image {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .token-manager {
+            background: rgba(37, 99, 235, 0.05);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .token-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .token-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: #fca5a5;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .file-selected {
+            color: var(--success);
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 12px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-primary {
+                grid-column: span 1;
+            }
+
+            .navbar {
+                flex-direction: column;
+                gap: 12px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="navbar">
+            <div class="logo">✨ Vheer AI</div>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                Connected
+            </div>
+        </div>
+
+        <!-- Main Panel -->
+        <div class="card" id="inputPanel">
+            <button class="btn-small btn-danger" onclick="clearToken()">Clear Token</button>
+            <h2>Image Transformation</h2>
+            <p class="card-description">Upload an image and describe the transformation you want</p>
+
+            <div class="token-manager" id="tokenStatus">
+                <span class="token-status">
+                    <span class="token-dot"></span>
+                    Token not configured
+                </span>
+            </div>
+
+            <div class="form-group">
+                <label for="promptInput">Transformation Prompt</label>
+                <textarea id="promptInput" placeholder="e.g., Remove the jacket, Change to summer style..." oninput="checkFormReady()"></textarea>
+            </div>
+
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📷</div>
+                <div class="upload-text">Click to upload or drag & drop</div>
+                <div class="upload-hint">Supports JPG, PNG, WebP (Max 10MB)</div>
+                <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+            </div>
+
+            <!-- Image Preview Container -->
+            <div class="preview-container" id="previewContainer">
+                <div class="preview-label">📸 Selected Image</div>
+                <img id="previewImage" class="preview-image" src="" alt="Preview">
+            </div>
+
+            <div id="fileName" class="file-selected" style="display: none;">
+                ✓ <span id="fileNameText"></span>
+            </div>
+
+            <button class="btn-primary" id="generateBtn" onclick="startGeneration()" disabled>
+                🚀 Generate Image
+            </button>
+        </div>
+
+        <!-- Processing Panel -->
+        <div class="card" id="processingPanel" class="hidden">
+            <h2 id="processingTitle">Processing...</h2>
+            <p class="card-description" id="processingDesc">Uploading your image and preparing generation</p>
+            
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0%</div>
+                <div class="status-message" id="statusMessage">Initializing pipeline...</div>
+            </div>
+        </div>
+
+        <!-- Result Panel -->
+        <div class="card" id="resultPanel" class="hidden">
+            <h2 style="color: var(--success); margin-bottom: 15px;">✓ Complete!</h2>
+            <img id="resultImage" class="result-image" src="" alt="Generated image">
+            
+            <div class="button-group">
+                <button class="btn-success" onclick="downloadResult()">📥 Download</button>
+                <button class="btn-secondary" onclick="resetUI()">✎ Another Image</button>
+            </div>
+        </div>
+
+        <!-- Error Panel -->
+        <div class="error-message hidden" id="errorPanel"></div>
+    </div>
+
+    <script>
+        // Configuration - FIXED: Changed workflow name to vheer.yml
+        const CONFIG = {
+            REPO_OWNER: "My-Memory-2008",
+            REPO_NAME: "VHEER-IMAGE-TO-IMAGE-GENERATOR",
+            WORKFLOW_FILE: "vheer.yml",
+            TOKEN_KEY: "VHEER_GITHUB_TOKEN"
+        };
+
+        let uploadedImage = null;
+        let currentResultUrl = null;
+        let uploadedImageDataUrl = null;
+
+        // ============================================================================
+        // Form Validation
+        // ============================================================================
+        function checkFormReady() {
+            const hasImage = uploadedImage !== null;
+            const hasPrompt = document.getElementById("promptInput").value.trim().length > 0;
+            const isEnabled = hasImage && hasPrompt;
+            document.getElementById("generateBtn").disabled = !isEnabled;
+            console.log("Form check - Image:", hasImage, "Prompt:", hasPrompt, "Button enabled:", isEnabled);
+        }
+
+        // ============================================================================
+        // Token Management
+        // ============================================================================
+        function clearToken() {
+            localStorage.removeItem(CONFIG.TOKEN_KEY);
+            updateTokenStatus();
+            alert("Token cleared successfully");
+        }
+
+        function updateTokenStatus() {
+            const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+            const statusEl = document.getElementById("tokenStatus");
+            if (token) {
+                statusEl.innerHTML = `
+                    <span class="token-status">
+                        <span class="token-dot"></span>
+                        Token: ${token.substring(0, 10)}...
+                    </span>
+                `;
+            } else {
+                statusEl.innerHTML = `
+                    <span class="token-status">
+                        <span class="token-dot" style="background: #ef4444;"></span>
+                        Token not configured
+                    </span>
+                `;
+            }
+        }
+
+        async function getToken() {
+            let token = localStorage.getItem(CONFIG.TOKEN_KEY);
+            if (!token) {
+                token = prompt("🔒 Enter your GitHub Personal Access Token (requires 'repo' scope):");
+                if (token && token.trim()) {
+                    localStorage.setItem(CONFIG.TOKEN_KEY, token.trim());
+                    updateTokenStatus();
+                    return token.trim();
+                }
+                return null;
+            }
+            return token;
+        }
+
+        // ============================================================================
+        // File Handling
+        // ============================================================================
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.size > 10 * 1024 * 1024) {
+                showError("File too large. Maximum 10MB.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImageDataUrl = e.target.result; // Full data URL with header
+                uploadedImage = e.target.result.split(',')[1]; // Base64 only
+                
+                // Show preview
+                document.getElementById("previewImage").src = uploadedImageDataUrl;
+                document.getElementById("previewContainer").classList.add("show");
+                
+                // Show filename
+                document.getElementById("fileName").style.display = "block";
+                document.getElementById("fileNameText").textContent = file.name;
+                
+                console.log("Image loaded, triggering form check");
+                checkFormReady();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Drag & drop support
+        const zone = document.getElementById("uploadZone");
+        zone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            zone.classList.add("dragging");
+        });
+        zone.addEventListener("dragleave", () => zone.classList.remove("dragging"));
+        zone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            zone.classList.remove("dragging");
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                document.getElementById("fileInput").files = e.dataTransfer.files;
+                handleFileSelect({ target: { files: [file] } });
+            }
+        });
+
+        // ============================================================================
+        // Generation Pipeline
+        // ============================================================================
+        async function startGeneration() {
+            console.log("Generate button clicked");
+            const prompt = document.getElementById("promptInput").value.trim();
+            
+            if (!uploadedImage) {
+                showError("Please select an image");
+                return;
+            }
+            
+            if (!prompt) {
+                showError("Please enter a prompt");
+                return;
+            }
+
+            const token = await getToken();
+            if (!token) {
+                showError("Token required. Please provide a GitHub PAT.");
+                return;
+            }
+
+            clearError();
+            showProcessing();
+            
+            try {
+                await uploadImage(token, prompt);
+            } catch (error) {
+                console.error("Pipeline error:", error);
+                showError(error.message);
+                resetUI();
+            }
+        }
+
+        async function uploadImage(token, prompt) {
+            updateProgress(15, "Uploading image to repository...");
+
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/contents/input-image.png`;
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
+
+            // Get current SHA
+            const checkRes = await fetch(url, { headers });
+            let sha = null;
+            if (checkRes.ok) {
+                const data = await checkRes.json();
+                sha = data.sha;
+            }
+
+            // Upload image
+            const uploadRes = await fetch(url, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({
+                    message: `[Web UI] Image upload at ${new Date().toISOString()}`,
+                    content: uploadedImage,
+                    sha: sha || undefined,
+                    branch: "main"
+                })
+            });
+
+            if (!uploadRes.ok) {
+                throw new Error("Failed to upload image. Check your token and repo settings.");
+            }
+
+            updateProgress(35, "Dispatching workflow...");
+            const triggerTime = new Date().toISOString();
+            await dispatchWorkflow(token, prompt, triggerTime);
+        }
+
+        async function dispatchWorkflow(token, prompt, triggerTime) {
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
+            console.log("Dispatching workflow to:", url);
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
+
+            const res = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ ref: "main", inputs: { prompt } })
+            });
+
+            console.log("Dispatch response status:", res.status);
+            if (res.status !== 204 && res.status !== 200) {
+                const errText = await res.text();
+                console.error("Dispatch error:", errText);
+                throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
+            }
+
+            updateProgress(50, "Waiting for workflow to complete...");
+            await pollWorkflow(token, triggerTime);
+        }
+
+        async function pollWorkflow(token, triggerTime) {
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json"
+            };
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs`;
+
+            let progress = 50;
+            const pollInterval = setInterval(async () => {
+                try {
+                    // Simulate progress
+                    if (progress < 85) {
+                        progress += Math.random() * 8;
+                        updateProgress(Math.min(progress, 85), "Generating image...");
+                    }
+
+                    const res = await fetch(url, { headers });
+                    if (!res.ok) return;
+
+                    const data = await res.json();
+                    const recentRun = data.workflow_runs.find(
+                        run => new Date(run.created_at) >= new Date(triggerTime)
+                    );
+
+                    if (recentRun && recentRun.status === "completed") {
+                        clearInterval(pollInterval);
+
+                        if (recentRun.conclusion === "success") {
+                            updateProgress(95, "Fetching result...");
+                            await fetchArtifact(token, recentRun.id);
+                        } else {
+                            throw new Error("Workflow failed. Check the workflow logs for details.");
+                        }
+                    }
+                } catch (error) {
+                    clearInterval(pollInterval);
+                    throw error;
+                }
+            }, 5000);
+        }
+
+        async function fetchArtifact(token, runId) {
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json"
+            };
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs/${runId}/artifacts`;
+
+            const res = await fetch(url, { headers });
+            if (!res.ok) throw new Error("Failed to fetch artifacts");
+
+            const data = await res.json();
+            if (!data.artifacts || data.artifacts.length === 0) {
+                throw new Error("No artifacts found");
+            }
+
+            const artifact = data.artifacts[0];
+            const zipUrl = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/artifacts/${artifact.id}/zip`;
+
+            updateProgress(98, "Extracting image...");
+            const zipRes = await fetch(zipUrl, { headers });
+            const blob = await zipRes.blob();
+
+            const zip = await JSZip.loadAsync(blob);
+            const imageFile = Object.keys(zip.files).find(
+                name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')
+            );
+
+            if (!imageFile) throw new Error("No image found in artifact");
+
+            const imageBlob = await zip.files[imageFile].async("blob");
+            currentResultUrl = URL.createObjectURL(imageBlob);
+
+            updateProgress(100, "Done!");
+            setTimeout(showResult, 500);
+        }
+
+        // ============================================================================
+        // UI Updates
+        // ============================================================================
+        function updateProgress(percent, message) {
+            document.getElementById("progressFill").style.width = percent + "%";
+            document.getElementById("progressText").textContent = Math.round(percent) + "%";
+            document.getElementById("statusMessage").textContent = message;
+        }
+
+        function showProcessing() {
+            document.getElementById("inputPanel").classList.add("hidden");
+            document.getElementById("processingPanel").classList.remove("hidden");
+            document.getElementById("resultPanel").classList.add("hidden");
+            updateProgress(0, "Starting...");
+        }
+
+        function showResult() {
+            document.getElementById("processingPanel").classList.add("hidden");
+            document.getElementById("resultPanel").classList.remove("hidden");
+            document.getElementById("resultImage").src = currentResultUrl;
+        }
+
+        function resetUI() {
+            document.getElementById("inputPanel").classList.remove("hidden");
+            document.getElementById("processingPanel").classList.add("hidden");
+            document.getElementById("resultPanel").classList.add("hidden");
+            document.getElementById("promptInput").value = "";
+            document.getElementById("fileInput").value = "";
+            document.getElementById("fileName").style.display = "none";
+            document.getElementById("previewContainer").classList.remove("show");
+            uploadedImage = null;
+            uploadedImageDataUrl = null;
+            checkFormReady();
+            clearError();
+        }
+
+        function downloadResult() {
+            const a = document.createElement("a");
+            a.href = currentResultUrl;
+            a.download = `vheer_${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function showError(message) {
+            const panel = document.getElementById("errorPanel");
+            panel.textContent = "⚠ " + message;
+            panel.classList.remove("hidden");
+        }
+
+        function clearError() {
+            document.getElementById("errorPanel").classList.add("hidden");
+        }
+
+        // Initialize
+        updateTokenStatus();
+        console.log("Page loaded - workflow file:", CONFIG.WORKFLOW_FILE);
+    </script>
+</body>
+</html>
