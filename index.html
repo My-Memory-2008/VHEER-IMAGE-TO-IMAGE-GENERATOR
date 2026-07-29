@@ -606,10 +606,9 @@
 
     document.getElementById("inputPanel").classList.add("hidden");
     document.getElementById("processingPanel").classList.remove("hidden");
-    document.getElementById("statusMessage").textContent = "Starting AI Engine...";
+    document.getElementById("statusMessage").textContent = "Uploading to secure server...";
 
     try {
-        // Send to our Vercel API route
         const response = await fetch('/api/dispatch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -619,14 +618,9 @@
             })
         });
 
-        const data = await response.json();
+        if (!response.ok) throw new Error("Failed to connect to server");
 
-        if (!response.ok) {
-            throw new Error(data.details || data.error || "Unknown error");
-        }
-
-        document.getElementById("statusMessage").textContent = "✅ Success! The AI is working. Check GitHub artifacts in a few minutes.";
-        
+        document.getElementById("statusMessage").textContent = "✅ AI Engine started! Check GitHub artifacts in a few minutes.";
         setTimeout(() => {
             document.getElementById("processingPanel").classList.add("hidden");
             document.getElementById("resultPanel").classList.remove("hidden");
