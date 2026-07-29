@@ -609,27 +609,64 @@
     document.getElementById("statusMessage").textContent = "Uploading to secure server...";
 
     try {
-        const response = await fetch('/api/dispatch', {
+        // 1. Start the process
+        const startRes = await fetch('/api/dispatch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: prompt,
-                image_data: uploadedImageDataUrl
-            })
+            body: JSON.stringify({ prompt: prompt, image_data: uploadedImageDataUrl })
         });
 
-        if (!response.ok) throw new Error("Failed to connect to server");
+        const startData = await startRes.json();
+        if (!startRes.ok) throw new Error(startData.error);
 
-        document.getElementById("statusMessage").textContent = "✅ AI Engine started! Check GitHub artifacts in a few minutes.";
-        setTimeout(() => {
-            document.getElementById("processingPanel").classList.add("hidden");
-            document.getElementById("resultPanel").classList.remove("hidden");
-        }, 3000);
+        const runId = startData.run_id;
+        let attempts = 0;
+        const maxAttempts = 60; // Check for 5 minutes (every 5 seconds)
+
+        // 2. Poll for completion
+        const poll = setInterval(async () => {
+            attempts++;
+            document.getElementById("statusMessage").textContent = `AI is working... (${attempts * 5}s elapsed)`;
+            
+            const statusRes = await fetch(`/api/status?run_id=${runId}`);
+            const statusData = await statusRes.json();
+
+            if (statusData.status === 'success') {
+                clearInterval(poll);
+                document.getElementById("statusMessage").textContent = "Fetching final image...";
+                
+                // 3. Download the artifact via Vercel to avoid CORS/Auth issues
+                // Note: archive_download_url redirects to a S3 bucket, we might need to handle that
+                // For simplicity, let's just tell the user it's done and provide a manual link if needed
+                // Or better, use the artifact ID to download directly
+                
+                showResultManual(runId); 
+            } else if (statusData.conclusion === 'failure') {
+                clearInterval(poll);
+                throw new Error("Workflow failed. Check GitHub logs.");
+            } else if (attempts >= maxAttempts) {
+                clearInterval(poll);
+                throw new Error("Timeout: AI took too long.");
+            }
+        }, 5000);
 
     } catch (error) {
         alert("Error: " + error.message);
         location.reload();
     }
+}
+
+function showResultManual(runId) {
+    document.getElementById("processingPanel").classList.add("hidden");
+    document.getElementById("resultPanel").classList.remove("hidden");
+    
+    // Since downloading artifacts via API requires a redirect that is hard to handle in simple JS,
+    // We will provide a direct link to the GitHub Action run where they can click "Artifacts"
+    const githubRunUrl = `https://github.com/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${runId}`;
+    
+    document.getElementById("statusMessage").innerHTML = 
+        `✅ <b>Complete!</b> <br> 
+         <a href="${githubRunUrl}" target="_blank" style="color: #10b981; text-decoration: underline;">Click here to download your image from GitHub</a>`;
 }
         async function uploadImage(token, prompt) {
             updateProgress(15, "Uploading image to repository...");
