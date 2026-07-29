@@ -7,7 +7,8 @@ export default async function handler(req, res) {
   const token = process.env.GITHUB_TOKEN;
 
   if (!token) {
-    return res.status(500).json({ error: 'Server configuration error: Missing token' });
+    console.error('❌ GITHUB_TOKEN environment variable is not set in Vercel');
+    return res.status(500).json({ error: 'Server configuration error: Missing GITHUB_TOKEN' });
   }
 
   try {
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
-          'Authorization': `token ${token}`,
+          'Authorization': `Bearer ${token}`, // Changed to Bearer (more reliable than 'token')
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
         },
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
           ref: 'main',
           inputs: {
             prompt: prompt,
-            image_data: image_data // Passing the full base64 string
+            image_data: image_data
           }
         })
       }
@@ -32,11 +33,17 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`GitHub API Error: ${response.status} - ${errText}`);
+      // ✅ THIS IS THE KEY: Log the actual GitHub error to Vercel logs
+      console.error(`❌ GitHub API Error (${response.status}):`, errText);
+      return res.status(response.status).json({ 
+        error: `GitHub API Error: ${response.status}`,
+        details: errText 
+      });
     }
 
     return res.status(200).json({ message: 'Workflow dispatched successfully' });
   } catch (error) {
+    console.error('❌ Dispatch Exception:', error.message);
     return res.status(500).json({ error: error.message });
   }
 }
