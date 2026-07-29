@@ -57,7 +57,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Check Status
+    // 1. Check Workflow Status
     const runUrl = `https://api.github.com/repos/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${run_id}`;
     const runRes = await fetch(runUrl, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'completed', conclusion: runData.conclusion });
     }
 
-    // 2. Get Artifact
+    // 2. Get Artifacts (Grab the first one since there is only one)
     const artUrl = `https://api.github.com/repos/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${run_id}/artifacts`;
     const artRes = await fetch(artUrl, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
@@ -82,8 +82,10 @@ export default async function handler(req, res) {
     if (artData.artifacts && artData.artifacts.length > 0) {
       const artifact = artData.artifacts[0];
       
-      // Get the redirect URL for the ZIP
+      // 3. Get the Redirect URL for the ZIP
       const zipUrl = artifact.archive_download_url;
+      
+      // We must follow the redirect manually to get the actual storage URL
       const redirectRes = await fetch(zipUrl, { 
         headers: { 'Authorization': `Bearer ${token}` },
         redirect: 'manual' 
@@ -100,9 +102,10 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(404).json({ error: 'No artifacts found' });
+    return res.status(404).json({ error: 'No artifacts found in this run' });
 
   } catch (error) {
+    console.error("Status API Error:", error);
     return res.status(500).json({ error: error.message });
   }
 }
