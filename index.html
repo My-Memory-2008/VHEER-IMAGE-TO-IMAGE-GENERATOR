@@ -240,6 +240,7 @@
             border-radius: 12px;
             border: 1px solid var(--border);
             margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
         }
 
         .hidden {
@@ -304,17 +305,17 @@
 
         <!-- Result Panel -->
         <div class="card hidden" id="resultPanel">
-            <h2 style="color: var(--success);">✓ Complete!</h2>
-            <p class="status-message" id="finalStatus"></p>
-            <div id="resultImageContainer"></div>
+            <h2 style="color: var(--success); margin-bottom: 15px;">✓ Complete!</h2>
+            <img id="resultImage" class="result-image" src="" alt="Generated AI Image">
             
-            <button class="btn-success" onclick="resetUI()">✎ Generate Another</button>
+            <button class="btn-success" onclick="downloadResult()">📥 Download Image</button>
+            <button class="btn-primary" onclick="resetUI()" style="background: var(--bg-secondary); border: 1px solid var(--border); margin-top: 10px;">✎ Another Image</button>
         </div>
     </div>
 
     <script>
         let uploadedImageDataUrl = null;
-        let currentResultBlobUrl = null;
+        let currentResultSrc = null;
 
         // ============================================================================
         // UI Helpers
@@ -349,67 +350,103 @@
             document.getElementById("fileInput").value = "";
             document.getElementById("previewContainer").classList.remove("show");
             document.getElementById("fileName").style.display = "none";
+            document.getElementById("resultImage").src = "";
             uploadedImageDataUrl = null;
+            currentResultSrc = null;
             checkFormReady();
         }
 
+        function downloadResult() {
+            if (currentResultSrc) {
+                const a = document.createElement("a");
+                a.href = currentResultSrc;
+                a.download = `vheer_result_${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+
+        // Compress image to stay under Vercel's 4.5MB limit
+        async function compressImage(dataUrl) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxWidth = 1024;
+                    const ratio = Math.min(maxWidth / img.width, 1);
+                    canvas.width = img.width * ratio;
+                    canvas.height = img.height * ratio;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.src = dataUrl;
+            });
+        }
+
         // ============================================================================
-        // Generation Logic
+        // Main Logic
         // ============================================================================
         async function startGeneration() {
             const prompt = document.getElementById("promptInput").value.trim();
             if (!uploadedImageDataUrl || !prompt) return;
 
-            // Switch UI
             document.getElementById("inputPanel").classList.add("hidden");
             document.getElementById("processingPanel").classList.remove("hidden");
             
             let progress = 0;
             const progressInterval = setInterval(() => {
                 if (progress < 90) {
-                    progress += Math.random() * 5;
+                    progress += Math.random() * 2;
                     document.getElementById("progressFill").style.width = progress + "%";
                 }
             }, 1000);
 
             try {
+                document.getElementById("statusMessage").textContent = "Compressing image...";
+                const compressedImage = await compressImage(uploadedImageDataUrl);
+                
                 document.getElementById("statusMessage").textContent = "Uploading to secure server...";
                 
-                // 1. Trigger Dispatch
                 const startRes = await fetch('/api/dispatch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt, image_data: uploadedImageDataUrl })
+                    body: JSON.stringify({ prompt: prompt, image_data: compressedImage })
                 });
 
                 const startData = await startRes.json();
                 if (!startRes.ok) throw new Error(startData.error || "Failed to start");
 
                 const runId = startData.run_id;
-                if (!runId) throw new Error("Could not get Run ID from server");
+                if (!runId) throw new Error("Could not get Run ID");
 
                 document.getElementById("statusMessage").textContent = "AI Engine started. Waiting for completion...";
 
-                // 2. Poll for Status
                 let attempts = 0;
-                const maxAttempts = 120; // 10 minutes max
-                
+                const maxAttempts = 120; // 10 minutes
+
                 const poll = setInterval(async () => {
                     attempts++;
                     try {
                         const statusRes = await fetch(`/api/status?run_id=${runId}`);
                         const statusData = await statusRes.json();
 
-                        if (statusData.status === 'completed') {
+                        // Check if we have the image data from the artifact
+                        if (statusData.status === 'success' && statusData.image_data) {
                             clearInterval(poll);
                             clearInterval(progressInterval);
                             document.getElementById("progressFill").style.width = "100%";
                             
-                            if (statusData.conclusion === 'success') {
-                                showSuccess(runId);
-                            } else {
-                                throw new Error("Workflow failed. Check GitHub logs.");
-                            }
+                            // Display the image directly
+                            currentResultSrc = statusData.image_data;
+                            document.getElementById("processingPanel").classList.add("hidden");
+                            document.getElementById("resultPanel").classList.remove("hidden");
+                            document.getElementById("resultImage").src = currentResultSrc;
+
+                        } else if (statusData.conclusion === 'failure') {
+                            clearInterval(poll);
+                            throw new Error("Workflow failed. Check GitHub logs.");
                         } else if (attempts >= maxAttempts) {
                             clearInterval(poll);
                             throw new Error("Timeout: AI took too long.");
@@ -426,21 +463,6 @@
                 alert("Error: " + error.message);
                 location.reload();
             }
-        }
-
-        function showSuccess(runId) {
-            document.getElementById("processingPanel").classList.add("hidden");
-            document.getElementById("resultPanel").classList.remove("hidden");
-            
-            const githubRunUrl = `https://github.com/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${runId}`;
-            
-            document.getElementById("finalStatus").innerHTML = `
-                ✅ <b>Generation Complete!</b><br>
-                Your image is ready in the GitHub Artifacts.<br>
-                <a href="${githubRunUrl}" target="_blank" style="color: var(--accent); text-decoration: underline; font-weight: bold;">
-                    Click here to Download Image
-                </a>
-            `;
         }
     </script>
 </body>
