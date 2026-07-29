@@ -95,6 +95,7 @@
 
 
 
+
 import JSZip from 'jszip';
 
 export default async function handler(req, res) {
@@ -129,7 +130,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'completed', conclusion: runData.conclusion });
     }
 
-    // 2. Get Artifacts List (Must use application/json here)
+    // 2. Get Artifacts List
     const artUrl = `https://api.github.com/repos/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${run_id}/artifacts`;
     const artRes = await fetch(artUrl, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
@@ -146,13 +147,8 @@ export default async function handler(req, res) {
     const artifact = artData.artifacts[0];
     const zipUrl = artifact.archive_download_url;
     
-    // Fetch the ZIP. We do NOT set Accept: octet-stream here because this URL 
-    // is a redirect to S3/GCS which doesn't care about headers, but the initial 
-    // GitHub redirect endpoint might. We use standard headers.
     const zipResponse = await fetch(zipUrl, {
-      headers: { 
-        'Authorization': `Bearer ${token}`
-      },
+      headers: { 'Authorization': `Bearer ${token}` },
       redirect: 'follow' 
     });
 
@@ -162,31 +158,42 @@ export default async function handler(req, res) {
     }
 
     const zipBlob = await zipResponse.blob();
-    
-    // Safety check: Ensure it's actually a ZIP file (starts with PK)
     const arrayBuffer = await zipBlob.arrayBuffer();
+    
+    // Safety check: Ensure it's actually a ZIP file
     const uint8Array = new Uint8Array(arrayBuffer);
     if (uint8Array[0] !== 0x50 || uint8Array[1] !== 0x4B) {
-      throw new Error('Downloaded file is not a valid ZIP. It might be an error page.');
+      throw new Error('Downloaded file is not a valid ZIP.');
     }
 
     // 4. Extract Image using JSZip
     const zip = await JSZip.loadAsync(arrayBuffer);
     let imageFile = null;
+    let allFiles = [];
     
     zip.forEach((relativePath, file) => {
-      if (!file.dir && (file.name.endsWith('.png') || file.name.endsWith('.jpg'))) {
+      allFiles.push(relativePath);
+      const lowerName = file.name.toLowerCase();
+      // Check for png, jpg, jpeg, or webp (case-insensitive)
+      if (!file.dir && (lowerName.endsWith('.png') || lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') || lowerName.endsWith('.webp'))) {
         imageFile = file;
       }
     });
 
     if (!imageFile) {
-      throw new Error('No image found in ZIP');
+      // This will print exactly what is inside the ZIP to your Vercel logs
+      console.error("❌ Files found in ZIP:", allFiles);
+      throw new Error(`No image found in ZIP. Files present: ${allFiles.join(', ')}`);
     }
 
     const base64Image = await imageFile.async("base64");
-    const mimeType = imageFile.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
     
+    // Determine MIME type based on the actual extension
+    const lowerName = imageFile.name.toLowerCase();
+    let mimeType = 'image/png';
+    if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mimeType = 'image/jpeg';
+    else if (lowerName.endsWith('.webp')) mimeType = 'image/webp';
+
     return res.status(200).json({ 
       status: 'success', 
       image_data: `data:${mimeType};base64,${base64Image}` 
