@@ -57,6 +57,72 @@
 #           retention-days: 3
 
 
+
+
+
+# name: Vheer Repository Image Generation Engine
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       prompt:
+#         description: 'AI Target Modification Prompt'
+#         required: true
+#         type: string
+#       input_filename:
+#         description: 'Name of the uploaded image file'
+#         required: true
+#         type: string
+
+# jobs:
+#   execute-pipeline:
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: write   # <--- THIS ALLOWS THE ACTION TO DELETE THE TEMP FILE
+#       actions: read
+#     steps:
+#       - name: Checkout Code Tree
+#         uses: actions/checkout@v4
+
+#       - name: Setup Python Runtime Environment
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.11'
+
+#       - name: Install Automation Dependencies
+#         run: |
+#           mkdir -p output
+#           pip install playwright pillow
+#           playwright install chromium --with-deps
+
+#       - name: Run Complete Vheer Pipeline
+#         run: |
+#           # Use the filename provided by Vercel
+#           export DETECTED_IMAGE_FILE="${{ inputs.input_filename }}"
+#           echo "Processing file: $DETECTED_IMAGE_FILE"
+#           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" python generator.py
+#         env:
+#           PROMPT_TEXT: ${{ inputs.prompt }}
+#           VHEER_AUTH_STATE: ${{ secrets.VHEER_AUTH_STATE }}
+
+#       - name: Export Generated Output Graphic
+#         uses: actions/upload-artifact@v4
+#         if: always()
+#         with:
+#           name: vheer-generated-output
+#           path: output/
+#           retention-days: 1
+      
+#       - name: Cleanup Temporary Input
+#         run: |
+#           git config --global user.email "action@github.com"
+#           git config --global user.name "GitHub Action"
+#           git rm ${{ inputs.input_filename }}
+#           git commit -m "Cleanup temp input"
+#           git push
+
+
+
+
 name: Vheer Repository Image Generation Engine
 on:
   workflow_dispatch:
@@ -74,7 +140,7 @@ jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # <--- THIS ALLOWS THE ACTION TO DELETE THE TEMP FILE
+      contents: write
       actions: read
     steps:
       - name: Checkout Code Tree
@@ -91,9 +157,29 @@ jobs:
           pip install playwright pillow
           playwright install chromium --with-deps
 
+      # ✅ ADD THIS: Wait for file to appear with retry logic
+      - name: Wait for Input File
+        run: |
+          FILENAME="${{ inputs.input_filename }}"
+          echo "Waiting for file: $FILENAME"
+          
+          # Try up to 10 times with 3 second delays
+          for i in {1..10}; do
+            if [ -f "$FILENAME" ]; then
+              echo "✅ File found: $FILENAME"
+              ls -lh "$FILENAME"
+              exit 0
+            fi
+            echo "⏳ Attempt $i: File not found yet. Waiting 3 seconds..."
+            sleep 3
+          done
+          
+          echo "❌ File not found after 30 seconds"
+          ls -la
+          exit 1
+
       - name: Run Complete Vheer Pipeline
         run: |
-          # Use the filename provided by Vercel
           export DETECTED_IMAGE_FILE="${{ inputs.input_filename }}"
           echo "Processing file: $DETECTED_IMAGE_FILE"
           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" python generator.py
@@ -103,18 +189,8 @@ jobs:
 
       - name: Export Generated Output Graphic
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: vheer-generated-output
           path: output/
           retention-days: 1
-      
-      - name: Cleanup Temporary Input
-        run: |
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          git rm ${{ inputs.input_filename }}
-          git commit -m "Cleanup temp input"
-          git push
-
-
+          if-no-files-found: error
