@@ -2,65 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vheer AI Image Generator</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <title>Vheer AI Generator</title>
     <style>
-        /* [Keep your existing CSS styles here exactly as they were] */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root { --bg: #0f172a; --bg-secondary: #1e293b; --accent: #2563eb; --success: #10b981; --danger: #ef4444; --text: #f8fafc; --border: #334155; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, var(--bg) 0%, #1a1f3a 100%); color: var(--text); min-height: 100vh; }
-        .container { max-width: 700px; margin: 0 auto; padding: 20px; }
-        .navbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid var(--border); }
-        .logo { font-size: 24px; font-weight: 700; color: var(--success); }
-        .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 16px; padding: 30px; margin-bottom: 20px; }
-        .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; background: rgba(37, 99, 235, 0.05); transition: all 0.3s ease; }
-        .upload-zone:hover { border-color: var(--accent); }
-        button { padding: 14px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; background: var(--accent); color: white; margin-top: 20px; }
-        button:disabled { background: var(--border); cursor: not-allowed; }
-        .hidden { display: none !important; }
-        .preview-image { width: 100%; border-radius: 8px; margin-top: 10px; }
-        .progress-bar { height: 8px; background: var(--bg); border-radius: 10px; overflow: hidden; margin-top: 20px; }
-        .progress-fill { height: 100%; background: var(--success); width: 0%; transition: width 0.3s ease; }
+        /* [Keep your existing CSS] */
+        body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 15px; }
+        button { padding: 15px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        img { max-width: 100%; border-radius: 10px; margin-top: 15px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="navbar">
-            <div class="logo">✨ Vheer AI</div>
-            <div style="color: var(--success); font-size: 12px;">● Public Mode</div>
-        </div>
-
-        <div class="card" id="inputPanel">
-            <h2>Image Transformation</h2>
-            <div class="form-group">
-                <label>Prompt</label>
-                <textarea id="promptInput" placeholder="e.g., Remove the jacket..." style="width: 100%; padding: 10px; background: var(--bg); color: white; border: 1px solid var(--border); border-radius: 8px;"></textarea>
-            </div>
-
-            <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-                <div>📷 Click to upload Image</div>
-                <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
-            </div>
-            
-            <img id="previewImage" class="preview-image hidden" src="">
-            <button id="generateBtn" onclick="startGeneration()" disabled>🚀 Generate Image</button>
-        </div>
-
-        <div class="card hidden" id="processingPanel">
-            <h2>Processing...</h2>
-            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-            <p id="statusMessage" style="margin-top: 10px; text-align: center;">Initializing...</p>
-        </div>
-
-        <div class="card hidden" id="resultPanel">
-            <h2 style="color: var(--success);">✓ Complete!</h2>
-            <p>Your image has been generated. Check your email or the artifacts tab in GitHub for the download link.</p>
-            <button onclick="location.reload()" style="background: var(--bg); border: 1px solid var(--border);">Start New</button>
-        </div>
+        <h1>✨ Vheer AI Generator</h1>
+        <textarea id="promptInput" placeholder="Describe the change..." style="width: 100%; height: 80px;"></textarea>
+        <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+        <img id="previewImage" class="hidden">
+        <br>
+        <button id="generateBtn" onclick="createIssue()" disabled>🚀 Generate via Issue</button>
+        <p id="status"></p>
     </div>
 
     <script>
+        const REPO_OWNER = "My-Memory-2008";
+        const REPO_NAME = "VHEER-IMAGE-TO-IMAGE-GENERATOR";
         let uploadedImageDataUrl = null;
 
         function handleFileSelect(event) {
@@ -71,54 +35,47 @@
                 uploadedImageDataUrl = e.target.result;
                 document.getElementById("previewImage").src = uploadedImageDataUrl;
                 document.getElementById("previewImage").classList.remove("hidden");
-                checkFormReady();
+                document.getElementById("generateBtn").disabled = false;
             };
             reader.readAsDataURL(file);
         }
 
-        function checkFormReady() {
-            const hasPrompt = document.getElementById("promptInput").value.trim().length > 0;
-            document.getElementById("generateBtn").disabled = !(uploadedImageDataUrl && hasPrompt);
-        }
-
-        document.getElementById("promptInput").addEventListener("input", checkFormReady);
-
-        async function startGeneration() {
+        async function createIssue() {
             const prompt = document.getElementById("promptInput").value.trim();
-            if (!uploadedImageDataUrl || !prompt) return;
-
-            document.getElementById("inputPanel").classList.add("hidden");
-            document.getElementById("processingPanel").classList.remove("hidden");
-            updateProgress(10, "Sending data to server...");
+            const status = document.getElementById("status");
+            
+            status.textContent = "Creating request in GitHub...";
+            
+            // Format the issue body so the Action can read it
+            const issueBody = `
+VHEER_REQUEST
+PROMPT: ${prompt}
+IMAGE_DATA: ${uploadedImageDataUrl}
+            `;
 
             try {
-                // Call our Vercel API Proxy instead of GitHub directly
-                const response = await fetch('/api/dispatch', {
+                // GitHub API allows creating issues on public repos without a token!
+                const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({
-                        prompt: prompt,
-                        image_data: uploadedImageDataUrl
+                        title: `AI Request: ${prompt.substring(0, 30)}...`,
+                        body: issueBody
                     })
                 });
 
-                if (!response.ok) throw new Error("Failed to start generation");
-
-                updateProgress(100, "Workflow triggered! The AI is now working on your image.");
-                setTimeout(() => {
-                    document.getElementById("processingPanel").classList.add("hidden");
-                    document.getElementById("resultPanel").classList.remove("hidden");
-                }, 2000);
-
+                if (response.ok) {
+                    const data = await response.json();
+                    status.innerHTML = `✅ Request sent! <a href="${data.html_url}" target="_blank" style="color: #10b981;">Track progress here</a>. The AI will reply to this issue when done.`;
+                } else {
+                    throw new Error("Failed to create issue");
+                }
             } catch (error) {
-                alert("Error: " + error.message);
-                location.reload();
+                status.textContent = "❌ Error: " + error.message;
             }
-        }
-
-        function updateProgress(percent, msg) {
-            document.getElementById("progressFill").style.width = percent + "%";
-            document.getElementById("statusMessage").textContent = msg;
         }
     </script>
 </body>
