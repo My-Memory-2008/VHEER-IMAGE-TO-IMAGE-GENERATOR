@@ -41,9 +41,8 @@
 //   }
 // }
 
+import JSZip from 'jszip';
 
-import JSZip from 'jszip'; // Note: You might need to run 'npm install jszip' locally before pushing if Vercel complains, 
-                           // but usually Vercel handles standard imports. If not, use the fetch-blob method below.
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -64,45 +63,65 @@ export default async function handler(req, res) {
     });
     const runData = await runRes.json();
 
+    // If not finished, tell the frontend to keep waiting
     if (runData.status !== 'completed') {
-      return res.status(200).json({ status: runData.status, conclusion: runData.conclusion });
+      return res.status(200).json({ status: runData.status });
     }
 
     if (runData.conclusion !== 'success') {
       return res.status(200).json({ status: 'completed', conclusion: runData.conclusion });
     }
 
-    // 2. Get Artifacts (Grab the first one since there is only one)
+    // 2. Get Artifact List
     const artUrl = `https://api.github.com/repos/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${run_id}/artifacts`;
     const artRes = await fetch(artUrl, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
     });
     const artData = await artRes.json();
 
-    if (artData.artifacts && artData.artifacts.length > 0) {
-      const artifact = artData.artifacts[0];
-      
-      // 3. Get the Redirect URL for the ZIP
-      const zipUrl = artifact.archive_download_url;
-      
-      // We must follow the redirect manually to get the actual storage URL
-      const redirectRes = await fetch(zipUrl, { 
-        headers: { 'Authorization': `Bearer ${token}` },
-        redirect: 'manual' 
-      });
-      
-      let finalUrl = zipUrl;
-      if (redirectRes.status === 302) {
-        finalUrl = redirectRes.headers.get('location');
-      }
-
-      return res.status(200).json({ 
-        status: 'success', 
-        download_url: finalUrl 
-      });
+    if (!artData.artifacts || artData.artifacts.length === 0) {
+      return res.status(200).json({ status: 'completed', error: 'No artifacts yet' });
     }
 
-    return res.status(404).json({ error: 'No artifacts found in this run' });
+    // 3. Download the Artifact ZIP
+    const artifact = artData.artifacts[0];
+    const zipUrl = artifact.archive_download_url;
+    
+    // Follow redirect to get the real S3/storage URL
+    const redirectRes = await fetch(zipUrl, { 
+      headers: { 'Authorization': `Bearer ${token}` },
+      redirect: 'manual' 
+    });
+    
+    let finalZipUrl = zipUrl;
+    if (redirectRes.status === 302) {
+      finalZipUrl = redirectRes.headers.get('location');
+    }
+
+    // Fetch the actual ZIP content
+    const zipBlob = await fetch(finalZipUrl).then(r => r.blob());
+    const zip = await JSZip.loadAsync(zipBlob);
+
+    // 4. Extract the Image
+    let imageFile = null;
+    zip.forEach((relativePath, file) => {
+      if (!file.dir && (file.name.endsWith('.png') || file.name.endsWith('.jpg'))) {
+        imageFile = file;
+      }
+    });
+
+    if (!imageFile) {
+      return res.status(404).json({ error: 'No image found in artifact' });
+    }
+
+    // 5. Convert to Base64 and Send
+    const base64Image = await imageFile.async("base64");
+    const mimeType = imageFile.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    
+    return res.status(200).json({ 
+      status: 'success', 
+      image_data: `data:${mimeType};base64,${base64Image}` 
+    });
 
   } catch (error) {
     console.error("Status API Error:", error);
