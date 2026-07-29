@@ -93,6 +93,8 @@
 
 
 
+
+
 import JSZip from 'jszip';
 
 export default async function handler(req, res) {
@@ -127,7 +129,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'completed', conclusion: runData.conclusion });
     }
 
-    // 2. Get Artifacts
+    // 2. Get Artifacts List (Must use application/json here)
     const artUrl = `https://api.github.com/repos/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${run_id}/artifacts`;
     const artRes = await fetch(artUrl, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
@@ -140,21 +142,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'processing', message: 'Waiting for artifacts...' });
     }
 
-    // 3. Download ZIP (Robust Method)
+    // 3. Download the ZIP
     const artifact = artData.artifacts[0];
     const zipUrl = artifact.archive_download_url;
     
-    // Fetch with redirect: 'follow' and ensure we get the blob
+    // Fetch the ZIP. We do NOT set Accept: octet-stream here because this URL 
+    // is a redirect to S3/GCS which doesn't care about headers, but the initial 
+    // GitHub redirect endpoint might. We use standard headers.
     const zipResponse = await fetch(zipUrl, {
       headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/octet-stream' 
+        'Authorization': `Bearer ${token}`
       },
       redirect: 'follow' 
     });
 
     if (!zipResponse.ok) {
-      throw new Error(`Failed to download ZIP: ${zipResponse.status} ${await zipResponse.text()}`);
+      const errText = await zipResponse.text();
+      throw new Error(`Failed to download ZIP: ${zipResponse.status} - ${errText}`);
     }
 
     const zipBlob = await zipResponse.blob();
@@ -163,7 +167,7 @@ export default async function handler(req, res) {
     const arrayBuffer = await zipBlob.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     if (uint8Array[0] !== 0x50 || uint8Array[1] !== 0x4B) {
-      throw new Error('Downloaded file is not a valid ZIP archive. It might be an error message.');
+      throw new Error('Downloaded file is not a valid ZIP. It might be an error page.');
     }
 
     // 4. Extract Image using JSZip
