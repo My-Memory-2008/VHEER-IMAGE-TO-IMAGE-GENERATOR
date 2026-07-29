@@ -93,11 +93,9 @@
 
 
 
-
 import JSZip from 'jszip';
 
 export default async function handler(req, res) {
-  // Allow CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   
   if (req.method !== 'GET') {
@@ -118,10 +116,9 @@ export default async function handler(req, res) {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
     });
     
-    if (!runRes.ok) throw new Error(`GitHub API Error: ${runRes.status}`);
+    if (!runRes.ok) throw new Error(`GitHub Run API failed: ${runRes.status}`);
     const runData = await runRes.json();
 
-    // If not finished, tell frontend to keep waiting
     if (runData.status !== 'completed') {
       return res.status(200).json({ status: runData.status });
     }
@@ -136,35 +133,43 @@ export default async function handler(req, res) {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
     });
     
-    if (!artRes.ok) throw new Error(`Artifact API Error: ${artRes.status}`);
+    if (!artRes.ok) throw new Error(`Artifact API failed: ${artRes.status}`);
     const artData = await artRes.json();
 
     if (!artData.artifacts || artData.artifacts.length === 0) {
-      // Return 200 but with an error flag so the frontend keeps polling
-      return res.status(200).json({ status: 'processing', message: 'Artifacts not ready yet' });
+      return res.status(200).json({ status: 'processing', message: 'Waiting for artifacts...' });
     }
 
-    // 3. Download the Artifact ZIP
+    // 3. Download ZIP (Robust Method)
     const artifact = artData.artifacts[0];
     const zipUrl = artifact.archive_download_url;
     
-    // Follow redirect to get the actual storage URL
-    const redirectRes = await fetch(zipUrl, { 
-      headers: { 'Authorization': `Bearer ${token}` },
-      redirect: 'manual' 
+    // Fetch with redirect: 'follow' and ensure we get the blob
+    const zipResponse = await fetch(zipUrl, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/octet-stream' 
+      },
+      redirect: 'follow' 
     });
-    
-    let finalZipUrl = zipUrl;
-    if (redirectRes.status === 302) {
-      finalZipUrl = redirectRes.headers.get('location');
+
+    if (!zipResponse.ok) {
+      throw new Error(`Failed to download ZIP: ${zipResponse.status} ${await zipResponse.text()}`);
     }
 
-    // Fetch the ZIP content
-    const zipBlob = await fetch(finalZipUrl).then(r => r.blob());
-    const zip = await JSZip.loadAsync(zipBlob);
+    const zipBlob = await zipResponse.blob();
+    
+    // Safety check: Ensure it's actually a ZIP file (starts with PK)
+    const arrayBuffer = await zipBlob.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    if (uint8Array[0] !== 0x50 || uint8Array[1] !== 0x4B) {
+      throw new Error('Downloaded file is not a valid ZIP archive. It might be an error message.');
+    }
 
-    // 4. Extract the Image
+    // 4. Extract Image using JSZip
+    const zip = await JSZip.loadAsync(arrayBuffer);
     let imageFile = null;
+    
     zip.forEach((relativePath, file) => {
       if (!file.dir && (file.name.endsWith('.png') || file.name.endsWith('.jpg'))) {
         imageFile = file;
@@ -172,10 +177,9 @@ export default async function handler(req, res) {
     });
 
     if (!imageFile) {
-      throw new Error('No image file found inside the artifact ZIP');
+      throw new Error('No image found in ZIP');
     }
 
-    // 5. Convert to Base64 and Send
     const base64Image = await imageFile.async("base64");
     const mimeType = imageFile.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
     
@@ -185,7 +189,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("❌ Status API Crash:", error.message);
+    console.error("❌ STATUS API ERROR:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
