@@ -1,27 +1,29 @@
 export default async function handler(req, res) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get the token from Vercel's secure storage
   const token = process.env.GITHUB_TOKEN;
-
   if (!token) {
-    console.error("❌ GITHUB_TOKEN is missing in Vercel Environment Variables");
-    return res.status(500).json({ error: 'Server configuration error' });
+    return res.status(500).json({ error: 'Missing GITHUB_TOKEN' });
   }
 
   try {
     const { prompt, image_data } = req.body;
+    
+    // CONFIGURATION - CHECK THESE NAMES AGAINST YOUR REPO
+    const repoOwner = "My-Memory-2008";
+    const repoName = "VHEER-IMAGE-TO-IMAGE-GENERATOR";
+    const workflowFile = "vheer.yml"; // <--- MUST MATCH EXACTLY
 
-    // Trigger the GitHub Workflow
+    console.log(`Attempting to trigger: ${workflowFile} in ${repoOwner}/${repoName}`);
+
     const response = await fetch(
-      `https://api.github.com/repos/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/workflows/vheer.yml/dispatches`,
+      `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/${workflowFile}/dispatches`,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`, // Use Bearer for better compatibility
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
         },
@@ -37,9 +39,20 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`GitHub API Error: ${response.status} - ${errorText}`);
+      console.error(`GitHub API Error (${response.status}):`, errorText);
+      
+      // If it's a 422, let's try to list workflows to see what GitHub actually sees
+      if (response.status === 422) {
+         const listRes = await fetch(
+            `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+         );
+         const listData = await listRes.json();
+         console.error("Available workflows:", listData.workflows.map(w => w.name));
+      }
+
       return res.status(response.status).json({ 
-        error: 'Failed to trigger workflow', 
+        error: 'Workflow trigger failed', 
         details: errorText 
       });
     }
