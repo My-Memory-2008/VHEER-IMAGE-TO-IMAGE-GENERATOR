@@ -73,6 +73,9 @@ on:
 jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # <--- THIS ALLOWS THE ACTION TO DELETE THE TEMP FILE
+      actions: read
     steps:
       - name: Checkout Code Tree
         uses: actions/checkout@v4
