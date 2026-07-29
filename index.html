@@ -2,51 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vheer AI Image Generator</title>
-    <!-- JSZip is required to extract the image from the GitHub Artifact ZIP -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <title>Vheer AI Generator</title>
     <style>
-        /* [Keep your existing CSS styles here] */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root { --bg: #0f172a; --bg-secondary: #1e293b; --accent: #2563eb; --success: #10b981; --text: #f8fafc; --border: #334155; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; }
-        .container { max-width: 700px; margin: 0 auto; }
-        .card { background: var(--bg-secondary); padding: 30px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 20px; }
-        .hidden { display: none !important; }
-        button { padding: 15px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
-        img { max-width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid var(--border); }
-        .progress-bar { height: 8px; background: var(--bg); border-radius: 10px; overflow: hidden; margin-top: 20px; }
-        .progress-fill { height: 100%; background: var(--success); width: 0%; transition: width 0.5s ease; }
+        /* [Keep your existing CSS] */
+        body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 15px; }
+        button { padding: 15px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 10px; }
+        img { max-width: 100%; border-radius: 10px; margin-top: 15px; border: 1px solid #334155; }
+        .hidden { display: none; }
+        .progress-bar { height: 8px; background: #0f172a; border-radius: 10px; overflow: hidden; margin-top: 20px; }
+        .progress-fill { height: 100%; background: #10b981; width: 0%; transition: width 0.5s ease; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 style="text-align: center; margin-bottom: 30px;">✨ Vheer AI Generator</h1>
-
-        <!-- Input Panel -->
-        <div class="card" id="inputPanel">
-            <textarea id="promptInput" placeholder="Describe the transformation..." style="width: 100%; height: 80px; margin-bottom: 15px; padding: 10px;"></textarea>
-            <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)" style="margin-bottom: 15px;">
-            <img id="previewImage" class="hidden" style="max-height: 200px; object-fit: contain;">
-            <br><br>
-            <button id="generateBtn" onclick="startGeneration()" disabled>🚀 Generate Image</button>
+        <h1>✨ Vheer AI</h1>
+        
+        <!-- Input -->
+        <div id="inputPanel">
+            <textarea id="promptInput" placeholder="Describe the change..." style="width: 100%; height: 80px;"></textarea>
+            <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+            <img id="previewImage" class="hidden" style="max-height: 200px;">
+            <button id="generateBtn" onclick="startGeneration()" disabled>🚀 Generate</button>
         </div>
 
-        <!-- Processing Panel -->
-        <div class="card hidden" id="processingPanel">
-            <h2>AI is working...</h2>
+        <!-- Processing -->
+        <div id="processingPanel" class="hidden">
+            <h2>AI is Working...</h2>
             <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-            <p id="statusMessage" style="text-align: center; margin-top: 10px; color: #94a3b8;">Initializing...</p>
+            <p id="statusMessage">Waiting for workflow to complete...</p>
         </div>
 
-        <!-- Result Panel -->
-        <div class="card hidden" id="resultPanel">
-            <h2 style="color: var(--success);">✓ Complete!</h2>
+        <!-- Result -->
+        <div id="resultPanel" class="hidden">
+            <h2 style="color: #10b981;">✓ Complete!</h2>
             <img id="resultImage" src="" alt="Generated Image">
-            <br><br>
-            <button onclick="downloadResult()" style="background: var(--success);">📥 Download Image</button>
-            <button onclick="resetUI()" style="background: var(--bg-secondary); border: 1px solid var(--border); margin-top: 10px;">✎ Start Over</button>
+            <button onclick="downloadResult()" style="background: #10b981;">📥 Download</button>
+            <button onclick="resetUI()" style="background: #334155;">✎ New Image</button>
         </div>
     </div>
 
@@ -72,8 +64,7 @@
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const maxWidth = 1024;
-                    const ratio = Math.min(maxWidth / img.width, 1);
+                    const ratio = Math.min(1024 / img.width, 1);
                     canvas.width = img.width * ratio;
                     canvas.height = img.height * ratio;
                     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -92,7 +83,7 @@
             
             let progress = 0;
             const progressInterval = setInterval(() => {
-                if (progress < 90) progress += 1;
+                if (progress < 90) progress += 0.5;
                 document.getElementById("progressFill").style.width = progress + "%";
             }, 1000);
 
@@ -107,7 +98,7 @@
 
                 const startData = await startRes.json();
                 if (!startRes.ok) throw new Error(startData.error);
-
+                
                 const runId = startData.run_id;
                 let attempts = 0;
 
@@ -118,43 +109,26 @@
                     const statusRes = await fetch(`/api/status?run_id=${runId}`);
                     const statusData = await statusRes.json();
 
-                    if (statusData.status === 'success' && statusData.download_url) {
+                    // ONLY show result when image_data is present
+                    if (statusData.status === 'success' && statusData.image_data) {
                         clearInterval(poll);
                         clearInterval(progressInterval);
                         document.getElementById("progressFill").style.width = "100%";
-                        document.getElementById("statusMessage").textContent = "Extracting image from artifact...";
-
-                        // Fetch the ZIP and Extract Image
-                        const zipResponse = await fetch(statusData.download_url);
-                        const zipBlob = await zipResponse.blob();
-                        const zip = await JSZip.loadAsync(zipBlob);
                         
-                        // Find the first image file in the ZIP
-                        let imageFile = null;
-                        zip.forEach((relativePath, file) => {
-                            if (!file.dir && (file.name.endsWith('.png') || file.name.endsWith('.jpg'))) {
-                                imageFile = file;
-                            }
-                        });
-
-                        if (imageFile) {
-                            const base64Image = await imageFile.async("base64");
-                            const mimeType = imageFile.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
-                            currentResultSrc = `data:${mimeType};base64,${base64Image}`;
-                            
-                            document.getElementById("processingPanel").classList.add("hidden");
-                            document.getElementById("resultPanel").classList.remove("hidden");
-                            document.getElementById("resultImage").src = currentResultSrc;
-                        } else {
-                            throw new Error("No image found inside the artifact ZIP.");
-                        }
-
+                        currentResultSrc = statusData.image_data;
+                        
+                        document.getElementById("processingPanel").classList.add("hidden");
+                        document.getElementById("resultPanel").classList.remove("hidden");
+                        document.getElementById("resultImage").src = currentResultSrc;
+                        
                     } else if (statusData.conclusion === 'failure') {
                         clearInterval(poll);
-                        throw new Error("Workflow failed.");
-                    } else if (attempts >= 120) { // 10 minute timeout
+                        alert("Workflow failed. Check GitHub logs.");
+                        location.reload();
+                    } else if (attempts >= 120) {
                         clearInterval(poll);
-                        throw new Error("Timeout.");
+                        alert("Timeout.");
+                        location.reload();
                     }
                 }, 5000);
 
