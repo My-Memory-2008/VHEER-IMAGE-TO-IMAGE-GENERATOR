@@ -1,3 +1,64 @@
+# name: Vheer Repository Image Generation Engine
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       prompt:
+#         description: 'AI Target Modification Prompt'
+#         required: true
+#         default: 'remove the jacket'
+#         type: string
+
+# jobs:
+#   execute-pipeline:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout Code Tree
+#         uses: actions/checkout@v4
+
+#       - name: Setup Python Runtime Environment
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.11'
+
+#       - name: Install Automation Dependencies
+#         run: |
+#           mkdir -p output
+#           pip install playwright
+#           playwright install chromium --with-deps
+
+#       - name: Run Complete Vheer Pipeline
+#         run: |
+#           # 1. Dynamically locate 'input-image' regardless of extension (.jpg, .png, etc.)
+#           echo "Locating the repository base file..."
+#           TARGET_FILE=$(find . -maxdepth 1 -iname "input-image*" -print -quit)
+          
+#           if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
+#             echo "::error:: Could not find any root file starting with 'input-image'"
+#             ls -la
+#             exit 1
+#           fi
+          
+#           CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
+#           echo "Discovered file target: $CLEAN_FILE_NAME"
+          
+#           # 2. Trigger the Python file within a Spoofed Virtual Display Buffer
+#           export DETECTED_IMAGE_FILE="$CLEAN_FILE_NAME"
+#           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" python generator.py
+#         env:
+#           PROMPT_TEXT: ${{ inputs.prompt }}
+#           VHEER_AUTH_STATE: ${{ secrets.VHEER_AUTH_STATE }}
+
+#       - name: Export Generated Output Graphic
+#         uses: actions/upload-artifact@v4
+#         if: always()
+#         with:
+#           name: vheer-generated-output
+#           path: output/
+#           retention-days: 3
+
+
+
+
 name: Vheer Repository Image Generation Engine
 on:
   workflow_dispatch:
@@ -5,7 +66,10 @@ on:
       prompt:
         description: 'AI Target Modification Prompt'
         required: true
-        default: 'remove the jacket'
+        type: string
+      image_data:
+        description: 'Base64 Encoded Image Data'
+        required: true
         type: string
 
 jobs:
@@ -23,26 +87,21 @@ jobs:
       - name: Install Automation Dependencies
         run: |
           mkdir -p output
-          pip install playwright
+          pip install playwright pillow
           playwright install chromium --with-deps
+
+      - name: Prepare Input Image from Payload
+        run: |
+          echo "Decoding base64 image from workflow input..."
+          # Remove the data:image/png;base64, prefix if present
+          CLEAN_DATA=$(echo "${{ inputs.image_data }}" | sed 's/^data:image\/[a-z]*;base64,//')
+          echo "$CLEAN_DATA" | base64 -d > input-image.png
+          echo "Image saved as input-image.png"
+          ls -la input-image.png
 
       - name: Run Complete Vheer Pipeline
         run: |
-          # 1. Dynamically locate 'input-image' regardless of extension (.jpg, .png, etc.)
-          echo "Locating the repository base file..."
-          TARGET_FILE=$(find . -maxdepth 1 -iname "input-image*" -print -quit)
-          
-          if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
-            echo "::error:: Could not find any root file starting with 'input-image'"
-            ls -la
-            exit 1
-          fi
-          
-          CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
-          echo "Discovered file target: $CLEAN_FILE_NAME"
-          
-          # 2. Trigger the Python file within a Spoofed Virtual Display Buffer
-          export DETECTED_IMAGE_FILE="$CLEAN_FILE_NAME"
+          export DETECTED_IMAGE_FILE="input-image.png"
           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" python generator.py
         env:
           PROMPT_TEXT: ${{ inputs.prompt }}
@@ -54,80 +113,4 @@ jobs:
         with:
           name: vheer-generated-output
           path: output/
-          retention-days: 3
-
-
-
-
-# name: Vheer Repository Image Generation Engine
-# on:
-#   workflow_dispatch:
-#     inputs:
-#       prompt:
-#         description: 'AI Target Modification Prompt'
-#         required: true
-#         type: string
-#   repository_dispatch:
-#     types: [web_ui_upload]
-
-# jobs:
-#   execute-pipeline:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout Code Tree
-#         uses: actions/checkout@v4
-
-#       - name: Setup Node environment
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: '20'
-
-#       - name: Resolve Inputs and Stage Image
-#         run: |
-#           mkdir -p output
-          
-#           # Check if the run came from the Website (Repository Dispatch)
-#           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-#             echo "Triggered via Web UI. Processing incoming base64 payload..."
-#             echo "${{ github.event.client_payload.image }}" | base64 --decode > input-image.png
-#             echo "PROMPT_VALUE=${{ github.event.client_payload.prompt }}" >> $GITHUB_ENV
-#             echo "IMAGE_VALUE=input-image.png" >> $GITHUB_ENV
-          
-#           # Otherwise, handle manual button trigger (Workflow Dispatch)
-#           else
-#             echo "Triggered manually via GitHub UI. Locating root file asset..."
-#             TARGET_FILE=$(find . -maxdepth 1 -iname "input-image*" -print -quit)
-#             if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
-#               echo "::error:: Could not find any root file starting with 'input-image'"
-#               ls -la && exit 1
-#             fi
-#             CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
-#             echo "PROMPT_VALUE=${{ github.event.inputs.prompt }}" >> $GITHUB_ENV
-#             echo "IMAGE_VALUE=$CLEAN_FILE_NAME" >> $GITHUB_ENV
-#           fi
-
-#       - name: Setup Python Runtime Environment
-#         uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.11'
-
-#       - name: Install Automation Dependencies
-#         run: |
-#           pip install playwright
-#           playwright install chromium --with-deps
-
-#       - name: Run Complete Vheer Pipeline
-#         run: |
-#           export DETECTED_IMAGE_FILE="$IMAGE_VALUE"
-#           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" python generator.py
-#         env:
-#           PROMPT_TEXT: ${{ env.PROMPT_VALUE }}
-#           VHEER_AUTH_STATE: ${{ secrets.VHEER_AUTH_STATE }}
-
-#       - name: Export Generated Output Graphic
-#         uses: actions/upload-artifact@v4
-#         if: always()
-#         with:
-#           name: vheer-output-image
-#           path: output/
-#           retention-days: 1
+          retention-days: 1
