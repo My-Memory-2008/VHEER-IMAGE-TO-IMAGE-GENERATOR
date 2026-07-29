@@ -509,17 +509,44 @@
         // ============================================================================
         // Token Management
         // ============================================================================
-        function checkTokenConfigured() {
-          // We no longer manage local tokens because Vercel handles this on the backend!
-          const statusEl = document.getElementById("tokenStatus");
-          if (statusEl) {
-            statusEl.innerHTML = `
-              <span class="token-status">
-                <span class="token-dot"></span>
-                Secure Server Authentication Active
-              </span>
-            `;
-          }
+        function clearToken() {
+            localStorage.removeItem(CONFIG.TOKEN_KEY);
+            updateTokenStatus();
+            alert("Token cleared successfully");
+        }
+
+        function updateTokenStatus() {
+            const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+            const statusEl = document.getElementById("tokenStatus");
+            if (token) {
+                statusEl.innerHTML = `
+                    <span class="token-status">
+                        <span class="token-dot"></span>
+                        Token: ${token.substring(0, 10)}...
+                    </span>
+                `;
+            } else {
+                statusEl.innerHTML = `
+                    <span class="token-status">
+                        <span class="token-dot" style="background: #ef4444;"></span>
+                        Token not configured
+                    </span>
+                `;
+            }
+        }
+
+        async function getToken() {
+            let token = localStorage.getItem(CONFIG.TOKEN_KEY);
+            if (!token) {
+                token = prompt("🔒 Enter your GitHub Personal Access Token (requires 'repo' scope):");
+                if (token && token.trim()) {
+                    localStorage.setItem(CONFIG.TOKEN_KEY, token.trim());
+                    updateTokenStatus();
+                    return token.trim();
+                }
+                return null;
+            }
+            return token;
         }
 
         // ============================================================================
@@ -537,7 +564,7 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 uploadedImageDataUrl = e.target.result; // Full data URL with header
-                uploadedImage = e.target.result.split(',')[1];
+                uploadedImage = e.target.result.split(',')[1]; // Base64 only
                 
                 // Show preview
                 document.getElementById("previewImage").src = uploadedImageDataUrl;
@@ -574,94 +601,178 @@
         // Generation Pipeline
         // ============================================================================
         async function startGeneration() {
-  const prompt = document.getElementById("promptInput").value.trim();
-  if (!uploadedImage) { showError("Please select an image"); return; }
-  if (!prompt) { showError("Please enter a prompt"); return; }
-  
-  clearError();
-  showProcessing();
-  updateProgress(10, "Triggering secure serverless runtime dispatch...");
+            console.log("Generate button clicked");
+            const prompt = document.getElementById("promptInput").value.trim();
+            
+            if (!uploadedImage) {
+                showError("Please select an image");
+                return;
+            }
+            
+            if (!prompt) {
+                showError("Please enter a prompt");
+                return;
+            }
 
-  try {
-    const triggerTime = new Date().toISOString();
-    
-    // 1. Kick off the pipeline via Vercel Function
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: uploadedImage, prompt: prompt })
-    });
+            const token = await getToken();
+            if (!token) {
+                showError("Token required. Please provide a GitHub PAT.");
+                return;
+            }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Server rejected trigger sequence.');
-    }
-    
-    updateProgress(25, "Job accepted by GitHub. Waiting for automation container to boot...");
-
-    // 2. Poll for workflow completion directly from the browser!
-    const REPO_OWNER = "My-Memory-2008";
-    const REPO_NAME = "VHEER-IMAGE-TO-IMAGE-GENERATOR";
-    let completedRunId = null;
-
-    // Loop for 5 minutes max (60 iterations * 5 seconds)
-    for (let i = 0; i < 60; i++) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      updateProgress(25 + (i * 0.8), `Processing execution tree... (Step ${i+1}/60)`);
-
-      try {
-        // Fetch run history publicly (No token required for public repositories!)
-        const runsRes = await fetch(`https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs`);
-        if (!runsRes.ok) continue;
-        
-        const runsData = await runsRes.json();
-        const recentRun = runsData.workflow_runs.find(
-          run => run.event === "repository_dispatch" && new Date(run.created_at) >= new Date(triggerTime)
-        );
-
-        if (recentRun && recentRun.status === "completed") {
-          if (recentRun.conclusion === "success") {
-            completedRunId = recentRun.id;
-            break;
-          } else {
-            throw new Error(`GitHub Pipeline finished with conclusion: ${recentRun.conclusion}`);
-          }
+            clearError();
+            showProcessing();
+            
+            try {
+                await uploadImage(token, prompt);
+            } catch (error) {
+                console.error("Pipeline error:", error);
+                showError(error.message);
+                resetUI();
+            }
         }
-      } catch (pollErr) {
-        console.warn("Polling error segment: ", pollErr);
-      }
-    }
 
-    if (!completedRunId) throw new Error("Processing sequence timed out on server cluster.");
+        async function uploadImage(token, prompt) {
+            updateProgress(15, "Uploading image to repository...");
 
-    updateProgress(90, "Downloading generated artifact archive package...");
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/contents/input-image.png`;
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
 
-    // 3. Request final zip download URL path
-    const artifactRes = await fetch(`https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs/${completedRunId}/artifacts`);
-    const artifactData = await artifactRes.json();
-    if (!artifactData.artifacts || artifactData.artifacts.length === 0) {
-      throw new Error("Pipeline run complete, but no output image files were exported.");
-    }
+            // Get current SHA
+            const checkRes = await fetch(url, { headers });
+            let sha = null;
+            if (checkRes.ok) {
+                const data = await checkRes.json();
+                sha = data.sha;
+            }
 
-    const targetArtifactId = artifactData.artifacts[0].id;
-    
-    // Redirect browser window to download artifact directly or via public proxy link
-    updateProgress(95, "Extracting artifact stream...");
-    
-    // Since download artifact binaries requires auth token from browser, we fallback to public zip or display action path link
-    const zipUrl = `https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/artifacts/${targetArtifactId}/zip`;
-    
-    // Direct user to open or read target artifact files layout
-    showError(`Processing complete! Your browser will now open the download package layout framework.`);
-    window.open(`https://github.com/{REPO_OWNER}/${REPO_NAME}/actions/runs/${completedRunId}`, '_blank');
-    resetUI();
+            // Upload image
+            const uploadRes = await fetch(url, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({
+                    message: `[Web UI] Image upload at ${new Date().toISOString()}`,
+                    content: uploadedImage,
+                    sha: sha || undefined,
+                    branch: "main"
+                })
+            });
 
-  } catch (error) {
-    console.error("Browser pipeline error:", error);
-    showError(error.message);
-    resetUI();
-  }
-}
+            if (!uploadRes.ok) {
+                throw new Error("Failed to upload image. Check your token and repo settings.");
+            }
+
+            updateProgress(35, "Dispatching workflow...");
+            const triggerTime = new Date().toISOString();
+            await dispatchWorkflow(token, prompt, triggerTime);
+        }
+
+        async function dispatchWorkflow(token, prompt, triggerTime) {
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
+            console.log("Dispatching workflow to:", url);
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            };
+
+            const res = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ ref: "main", inputs: { prompt } })
+            });
+
+            console.log("Dispatch response status:", res.status);
+            if (res.status !== 204 && res.status !== 200) {
+                const errText = await res.text();
+                console.error("Dispatch error:", errText);
+                throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
+            }
+
+            updateProgress(50, "Waiting for workflow to complete...");
+            await pollWorkflow(token, triggerTime);
+        }
+
+        async function pollWorkflow(token, triggerTime) {
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json"
+            };
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs`;
+
+            let progress = 50;
+            const pollInterval = setInterval(async () => {
+                try {
+                    // Simulate progress
+                    if (progress < 85) {
+                        progress += Math.random() * 8;
+                        updateProgress(Math.min(progress, 85), "Generating image...");
+                    }
+
+                    const res = await fetch(url, { headers });
+                    if (!res.ok) return;
+
+                    const data = await res.json();
+                    const recentRun = data.workflow_runs.find(
+                        run => new Date(run.created_at) >= new Date(triggerTime)
+                    );
+
+                    if (recentRun && recentRun.status === "completed") {
+                        clearInterval(pollInterval);
+
+                        if (recentRun.conclusion === "success") {
+                            updateProgress(95, "Fetching result...");
+                            await fetchArtifact(token, recentRun.id);
+                        } else {
+                            throw new Error("Workflow failed. Check the workflow logs for details.");
+                        }
+                    }
+                } catch (error) {
+                    clearInterval(pollInterval);
+                    throw error;
+                }
+            }, 5000);
+        }
+
+        async function fetchArtifact(token, runId) {
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json"
+            };
+            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs/${runId}/artifacts`;
+
+            const res = await fetch(url, { headers });
+            if (!res.ok) throw new Error("Failed to fetch artifacts");
+
+            const data = await res.json();
+            if (!data.artifacts || data.artifacts.length === 0) {
+                throw new Error("No artifacts found");
+            }
+
+            const artifact = data.artifacts[0];
+            const zipUrl = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/artifacts/${artifact.id}/zip`;
+
+            updateProgress(98, "Extracting image...");
+            const zipRes = await fetch(zipUrl, { headers });
+            const blob = await zipRes.blob();
+
+            const zip = await JSZip.loadAsync(blob);
+            const imageFile = Object.keys(zip.files).find(
+                name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')
+            );
+
+            if (!imageFile) throw new Error("No image found in artifact");
+
+            const imageBlob = await zip.files[imageFile].async("blob");
+            currentResultUrl = URL.createObjectURL(imageBlob);
+
+            updateProgress(100, "Done!");
+            setTimeout(showResult, 500);
+        }
 
         // ============================================================================
         // UI Updates
@@ -719,7 +830,7 @@
         }
 
         // Initialize
-        checkTokenConfigured();
+        updateTokenStatus();
         console.log("Page loaded - workflow file:", CONFIG.WORKFLOW_FILE);
     </script>
 </body>
