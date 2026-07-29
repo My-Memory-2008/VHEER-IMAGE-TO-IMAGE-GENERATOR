@@ -93,9 +93,13 @@
 
 
 
+
 import JSZip from 'jszip';
 
 export default async function handler(req, res) {
+  // Allow CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -113,6 +117,8 @@ export default async function handler(req, res) {
     const runRes = await fetch(runUrl, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
     });
+    
+    if (!runRes.ok) throw new Error(`GitHub API Error: ${runRes.status}`);
     const runData = await runRes.json();
 
     // If not finished, tell frontend to keep waiting
@@ -129,10 +135,13 @@ export default async function handler(req, res) {
     const artRes = await fetch(artUrl, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
     });
+    
+    if (!artRes.ok) throw new Error(`Artifact API Error: ${artRes.status}`);
     const artData = await artRes.json();
 
     if (!artData.artifacts || artData.artifacts.length === 0) {
-      return res.status(200).json({ status: 'completed', error: 'No artifacts found yet' });
+      // Return 200 but with an error flag so the frontend keeps polling
+      return res.status(200).json({ status: 'processing', message: 'Artifacts not ready yet' });
     }
 
     // 3. Download the Artifact ZIP
@@ -163,10 +172,10 @@ export default async function handler(req, res) {
     });
 
     if (!imageFile) {
-      return res.status(404).json({ error: 'No image found in artifact' });
+      throw new Error('No image file found inside the artifact ZIP');
     }
 
-    // 5. Convert to Base64 and Send to Browser
+    // 5. Convert to Base64 and Send
     const base64Image = await imageFile.async("base64");
     const mimeType = imageFile.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
     
@@ -176,7 +185,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Status API Error:", error);
+    console.error("❌ Status API Crash:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
