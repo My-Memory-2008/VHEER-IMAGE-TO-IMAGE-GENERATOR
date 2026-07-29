@@ -89,11 +89,6 @@
             transition: all 0.3s ease;
         }
 
-        .card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.1);
-        }
-
         .card h2 {
             font-size: 22px;
             margin-bottom: 8px;
@@ -120,7 +115,6 @@
             letter-spacing: 0.5px;
         }
 
-        input[type="text"],
         textarea {
             width: 100%;
             padding: 12px 14px;
@@ -130,19 +124,14 @@
             font-size: 14px;
             color: var(--text);
             font-family: inherit;
-            transition: all 0.2s ease;
+            resize: vertical;
+            min-height: 80px;
         }
 
-        input[type="text"]:focus,
         textarea:focus {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 80px;
         }
 
         .upload-zone {
@@ -159,27 +148,6 @@
         .upload-zone:hover {
             border-color: var(--accent);
             background: rgba(37, 99, 235, 0.1);
-        }
-
-        .upload-zone.dragging {
-            border-color: var(--success);
-            background: rgba(16, 185, 129, 0.1);
-        }
-
-        .upload-icon {
-            font-size: 32px;
-            margin-bottom: 12px;
-        }
-
-        .upload-text {
-            color: var(--text);
-            font-weight: 500;
-            margin-bottom: 4px;
-        }
-
-        .upload-hint {
-            color: var(--text-secondary);
-            font-size: 12px;
         }
 
         #fileInput {
@@ -199,26 +167,11 @@
             display: block;
         }
 
-        .preview-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-
         .preview-image {
             width: 100%;
             height: auto;
             border-radius: 8px;
             border: 1px solid var(--border);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .button-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
         }
 
         button {
@@ -231,62 +184,29 @@
             transition: all 0.2s ease;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            width: 100%;
         }
 
         .btn-primary {
             background: var(--accent);
             color: white;
-            grid-column: span 2;
         }
 
         .btn-primary:hover:not(:disabled) {
             background: var(--accent-hover);
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
         }
 
         .btn-primary:disabled {
             background: var(--border);
             color: var(--text-secondary);
             cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .btn-secondary {
-            background: var(--bg);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-            background: var(--border);
-            transform: translateY(-2px);
         }
 
         .btn-success {
             background: var(--success);
             color: white;
-        }
-
-        .btn-success:hover {
-            background: #059669;
-            transform: translateY(-2px);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-
-        .btn-small {
-            padding: 8px 12px;
-            font-size: 12px;
-            float: right;
-            margin-bottom: 15px;
+            margin-top: 10px;
         }
 
         .progress-container {
@@ -306,28 +226,19 @@
             height: 100%;
             background: linear-gradient(90deg, var(--accent), var(--success));
             width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 10px;
-        }
-
-        .progress-text {
-            font-size: 13px;
-            color: var(--success);
-            font-weight: 600;
-            text-align: right;
+            transition: width 0.5s ease;
         }
 
         .status-message {
             font-size: 13px;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            text-align: center;
         }
 
         .result-image {
             width: 100%;
             border-radius: 12px;
             border: 1px solid var(--border);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
             margin-bottom: 20px;
         }
 
@@ -335,70 +246,11 @@
             display: none !important;
         }
 
-        .token-manager {
-            background: rgba(37, 99, 235, 0.05);
-            border: 1px solid var(--accent);
-            border-radius: 8px;
-            padding: 12px 14px;
-            margin-bottom: 20px;
-            font-size: 12px;
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .token-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .token-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-
-        .error-message {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--danger);
-            color: #fca5a5;
-            padding: 12px 14px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 13px;
-        }
-
         .file-selected {
             color: var(--success);
             font-size: 13px;
             margin-bottom: 15px;
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                padding: 12px;
-            }
-
-            .card {
-                padding: 20px;
-            }
-
-            .button-group {
-                grid-template-columns: 1fr;
-            }
-
-            .btn-primary {
-                grid-column: span 1;
-            }
-
-            .navbar {
-                flex-direction: column;
-                gap: 12px;
-                text-align: center;
-            }
+            text-align: center;
         }
     </style>
 </head>
@@ -409,44 +261,30 @@
             <div class="logo">✨ Vheer AI</div>
             <div class="status-badge">
                 <span class="status-dot"></span>
-                Connected
+                Public Mode
             </div>
         </div>
 
-        <!-- Main Panel -->
+        <!-- Input Panel -->
         <div class="card" id="inputPanel">
-            <button class="btn-small btn-danger" onclick="clearToken()">Clear Token</button>
             <h2>Image Transformation</h2>
-            <p class="card-description">Upload an image and describe the transformation you want</p>
-
-            <div class="token-manager" id="tokenStatus">
-                <span class="token-status">
-                    <span class="token-dot"></span>
-                    Token not configured
-                </span>
-            </div>
+            <p class="card-description">Upload an image and describe the change</p>
 
             <div class="form-group">
-                <label for="promptInput">Transformation Prompt</label>
-                <textarea id="promptInput" placeholder="e.g., Remove the jacket, Change to summer style..." oninput="checkFormReady()"></textarea>
+                <label>Prompt</label>
+                <textarea id="promptInput" placeholder="e.g., Remove the jacket..." oninput="checkFormReady()"></textarea>
             </div>
 
-            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-                <div class="upload-icon">📷</div>
-                <div class="upload-text">Click to upload or drag & drop</div>
-                <div class="upload-hint">Supports JPG, PNG, WebP (Max 10MB)</div>
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                <div style="font-size: 32px;">📷</div>
+                <div>Click to upload Image</div>
                 <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
             </div>
 
-            <!-- Image Preview Container -->
             <div class="preview-container" id="previewContainer">
-                <div class="preview-label">📸 Selected Image</div>
                 <img id="previewImage" class="preview-image" src="" alt="Preview">
             </div>
-
-            <div id="fileName" class="file-selected" style="display: none;">
-                ✓ <span id="fileNameText"></span>
-            </div>
+            <div id="fileName" class="file-selected" style="display: none;"></div>
 
             <button class="btn-primary" id="generateBtn" onclick="startGeneration()" disabled>
                 🚀 Generate Image
@@ -454,382 +292,53 @@
         </div>
 
         <!-- Processing Panel -->
-        <div class="card" id="processingPanel" class="hidden">
-            <h2 id="processingTitle">Processing...</h2>
-            <p class="card-description" id="processingDesc">Uploading your image and preparing generation</p>
-            
+        <div class="card hidden" id="processingPanel">
+            <h2>Processing...</h2>
             <div class="progress-container">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
-                <div class="progress-text" id="progressText">0%</div>
-                <div class="status-message" id="statusMessage">Initializing pipeline...</div>
+                <div class="status-message" id="statusMessage">Initializing...</div>
             </div>
         </div>
 
         <!-- Result Panel -->
-        <div class="card" id="resultPanel" class="hidden">
-            <h2 style="color: var(--success); margin-bottom: 15px;">✓ Complete!</h2>
-            <img id="resultImage" class="result-image" src="" alt="Generated image">
+        <div class="card hidden" id="resultPanel">
+            <h2 style="color: var(--success);">✓ Complete!</h2>
+            <p class="status-message" id="finalStatus"></p>
+            <div id="resultImageContainer"></div>
             
-            <div class="button-group">
-                <button class="btn-success" onclick="downloadResult()">📥 Download</button>
-                <button class="btn-secondary" onclick="resetUI()">✎ Another Image</button>
-            </div>
+            <button class="btn-success" onclick="resetUI()">✎ Generate Another</button>
         </div>
-
-        <!-- Error Panel -->
-        <div class="error-message hidden" id="errorPanel"></div>
     </div>
 
     <script>
-        // Configuration - FIXED: Changed workflow name to vheer.yml
-        const CONFIG = {
-            REPO_OWNER: "My-Memory-2008",
-            REPO_NAME: "VHEER-IMAGE-TO-IMAGE-GENERATOR",
-            WORKFLOW_FILE: "vheer.yml",
-            TOKEN_KEY: "VHEER_GITHUB_TOKEN"
-        };
-
-        let uploadedImage = null;
-        let currentResultUrl = null;
         let uploadedImageDataUrl = null;
+        let currentResultBlobUrl = null;
 
         // ============================================================================
-        // Form Validation
+        // UI Helpers
         // ============================================================================
         function checkFormReady() {
-            const hasImage = uploadedImage !== null;
+            const hasImage = uploadedImageDataUrl !== null;
             const hasPrompt = document.getElementById("promptInput").value.trim().length > 0;
-            const isEnabled = hasImage && hasPrompt;
-            document.getElementById("generateBtn").disabled = !isEnabled;
-            console.log("Form check - Image:", hasImage, "Prompt:", hasPrompt, "Button enabled:", isEnabled);
+            document.getElementById("generateBtn").disabled = !(hasImage && hasPrompt);
         }
 
-        // ============================================================================
-        // Token Management
-        // ============================================================================
-        function clearToken() {
-            localStorage.removeItem(CONFIG.TOKEN_KEY);
-            updateTokenStatus();
-            alert("Token cleared successfully");
-        }
-
-        function updateTokenStatus() {
-            const token = localStorage.getItem(CONFIG.TOKEN_KEY);
-            const statusEl = document.getElementById("tokenStatus");
-            if (token) {
-                statusEl.innerHTML = `
-                    <span class="token-status">
-                        <span class="token-dot"></span>
-                        Token: ${token.substring(0, 10)}...
-                    </span>
-                `;
-            } else {
-                statusEl.innerHTML = `
-                    <span class="token-status">
-                        <span class="token-dot" style="background: #ef4444;"></span>
-                        Token not configured
-                    </span>
-                `;
-            }
-        }
-
-        async function getToken() {
-            let token = localStorage.getItem(CONFIG.TOKEN_KEY);
-            if (!token) {
-                token = prompt("🔒 Enter your GitHub Personal Access Token (requires 'repo' scope):");
-                if (token && token.trim()) {
-                    localStorage.setItem(CONFIG.TOKEN_KEY, token.trim());
-                    updateTokenStatus();
-                    return token.trim();
-                }
-                return null;
-            }
-            return token;
-        }
-
-        // ============================================================================
-        // File Handling
-        // ============================================================================
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            if (file.size > 10 * 1024 * 1024) {
-                showError("File too large. Maximum 10MB.");
-                return;
-            }
-
             const reader = new FileReader();
             reader.onload = (e) => {
-                uploadedImageDataUrl = e.target.result; // Full data URL with header
-                uploadedImage = e.target.result.split(',')[1]; // Base64 only
-                
-                // Show preview
+                uploadedImageDataUrl = e.target.result;
                 document.getElementById("previewImage").src = uploadedImageDataUrl;
                 document.getElementById("previewContainer").classList.add("show");
-                
-                // Show filename
+                document.getElementById("fileName").textContent = "✓ " + file.name;
                 document.getElementById("fileName").style.display = "block";
-                document.getElementById("fileNameText").textContent = file.name;
-                
-                console.log("Image loaded, triggering form check");
                 checkFormReady();
             };
             reader.readAsDataURL(file);
-        }
-
-        // Drag & drop support
-        const zone = document.getElementById("uploadZone");
-        zone.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            zone.classList.add("dragging");
-        });
-        zone.addEventListener("dragleave", () => zone.classList.remove("dragging"));
-        zone.addEventListener("drop", (e) => {
-            e.preventDefault();
-            zone.classList.remove("dragging");
-            const file = e.dataTransfer.files[0];
-            if (file) {
-                document.getElementById("fileInput").files = e.dataTransfer.files;
-                handleFileSelect({ target: { files: [file] } });
-            }
-        });
-
-        // ============================================================================
-        // Generation Pipeline
-        // ============================================================================
-        async function startGeneration() {
-    const prompt = document.getElementById("promptInput").value.trim();
-    if (!uploadedImageDataUrl || !prompt) return;
-
-    document.getElementById("inputPanel").classList.add("hidden");
-    document.getElementById("processingPanel").classList.remove("hidden");
-    document.getElementById("statusMessage").textContent = "Uploading to secure server...";
-
-    try {
-        // 1. Start the process
-        const startRes = await fetch('/api/dispatch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt, image_data: uploadedImageDataUrl })
-        });
-
-        const startData = await startRes.json();
-        if (!startRes.ok) throw new Error(startData.error);
-
-        const runId = startData.run_id;
-        let attempts = 0;
-        const maxAttempts = 60; // Check for 5 minutes (every 5 seconds)
-
-        // 2. Poll for completion
-        const poll = setInterval(async () => {
-            attempts++;
-            document.getElementById("statusMessage").textContent = `AI is working... (${attempts * 5}s elapsed)`;
-            
-            const statusRes = await fetch(`/api/status?run_id=${runId}`);
-            const statusData = await statusRes.json();
-
-            if (statusData.status === 'success') {
-                clearInterval(poll);
-                document.getElementById("statusMessage").textContent = "Fetching final image...";
-                
-                // 3. Download the artifact via Vercel to avoid CORS/Auth issues
-                // Note: archive_download_url redirects to a S3 bucket, we might need to handle that
-                // For simplicity, let's just tell the user it's done and provide a manual link if needed
-                // Or better, use the artifact ID to download directly
-                
-                showResultManual(runId); 
-            } else if (statusData.conclusion === 'failure') {
-                clearInterval(poll);
-                throw new Error("Workflow failed. Check GitHub logs.");
-            } else if (attempts >= maxAttempts) {
-                clearInterval(poll);
-                throw new Error("Timeout: AI took too long.");
-            }
-        }, 5000);
-
-    } catch (error) {
-        alert("Error: " + error.message);
-        location.reload();
-    }
-}
-
-function showResultManual(runId) {
-    document.getElementById("processingPanel").classList.add("hidden");
-    document.getElementById("resultPanel").classList.remove("hidden");
-    
-    // Since downloading artifacts via API requires a redirect that is hard to handle in simple JS,
-    // We will provide a direct link to the GitHub Action run where they can click "Artifacts"
-    const githubRunUrl = `https://github.com/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${runId}`;
-    
-    document.getElementById("statusMessage").innerHTML = 
-        `✅ <b>Complete!</b> <br> 
-         <a href="${githubRunUrl}" target="_blank" style="color: #10b981; text-decoration: underline;">Click here to download your image from GitHub</a>`;
-}
-        async function uploadImage(token, prompt) {
-            updateProgress(15, "Uploading image to repository...");
-
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/contents/input-image.png`;
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
-
-            // Get current SHA
-            const checkRes = await fetch(url, { headers });
-            let sha = null;
-            if (checkRes.ok) {
-                const data = await checkRes.json();
-                sha = data.sha;
-            }
-
-            // Upload image
-            const uploadRes = await fetch(url, {
-                method: "PUT",
-                headers,
-                body: JSON.stringify({
-                    message: `[Web UI] Image upload at ${new Date().toISOString()}`,
-                    content: uploadedImage,
-                    sha: sha || undefined,
-                    branch: "main"
-                })
-            });
-
-            if (!uploadRes.ok) {
-                throw new Error("Failed to upload image. Check your token and repo settings.");
-            }
-
-            updateProgress(35, "Dispatching workflow...");
-            const triggerTime = new Date().toISOString();
-            await dispatchWorkflow(token, prompt, triggerTime);
-        }
-
-        async function dispatchWorkflow(token, prompt, triggerTime) {
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/workflows/${CONFIG.WORKFLOW_FILE}/dispatches`;
-            console.log("Dispatching workflow to:", url);
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json",
-                "Content-Type": "application/json"
-            };
-
-            const res = await fetch(url, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ ref: "main", inputs: { prompt } })
-            });
-
-            console.log("Dispatch response status:", res.status);
-            if (res.status !== 204 && res.status !== 200) {
-                const errText = await res.text();
-                console.error("Dispatch error:", errText);
-                throw new Error("Failed to dispatch workflow. Ensure vheer.yml exists and token has repo scope.");
-            }
-
-            updateProgress(50, "Waiting for workflow to complete...");
-            await pollWorkflow(token, triggerTime);
-        }
-
-        async function pollWorkflow(token, triggerTime) {
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json"
-            };
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs`;
-
-            let progress = 50;
-            const pollInterval = setInterval(async () => {
-                try {
-                    // Simulate progress
-                    if (progress < 85) {
-                        progress += Math.random() * 8;
-                        updateProgress(Math.min(progress, 85), "Generating image...");
-                    }
-
-                    const res = await fetch(url, { headers });
-                    if (!res.ok) return;
-
-                    const data = await res.json();
-                    const recentRun = data.workflow_runs.find(
-                        run => new Date(run.created_at) >= new Date(triggerTime)
-                    );
-
-                    if (recentRun && recentRun.status === "completed") {
-                        clearInterval(pollInterval);
-
-                        if (recentRun.conclusion === "success") {
-                            updateProgress(95, "Fetching result...");
-                            await fetchArtifact(token, recentRun.id);
-                        } else {
-                            throw new Error("Workflow failed. Check the workflow logs for details.");
-                        }
-                    }
-                } catch (error) {
-                    clearInterval(pollInterval);
-                    throw error;
-                }
-            }, 5000);
-        }
-
-        async function fetchArtifact(token, runId) {
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Accept": "application/vnd.github.v3+json"
-            };
-            const url = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/runs/${runId}/artifacts`;
-
-            const res = await fetch(url, { headers });
-            if (!res.ok) throw new Error("Failed to fetch artifacts");
-
-            const data = await res.json();
-            if (!data.artifacts || data.artifacts.length === 0) {
-                throw new Error("No artifacts found");
-            }
-
-            const artifact = data.artifacts[0];
-            const zipUrl = `https://api.github.com/repos/${CONFIG.REPO_OWNER}/${CONFIG.REPO_NAME}/actions/artifacts/${artifact.id}/zip`;
-
-            updateProgress(98, "Extracting image...");
-            const zipRes = await fetch(zipUrl, { headers });
-            const blob = await zipRes.blob();
-
-            const zip = await JSZip.loadAsync(blob);
-            const imageFile = Object.keys(zip.files).find(
-                name => name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')
-            );
-
-            if (!imageFile) throw new Error("No image found in artifact");
-
-            const imageBlob = await zip.files[imageFile].async("blob");
-            currentResultUrl = URL.createObjectURL(imageBlob);
-
-            updateProgress(100, "Done!");
-            setTimeout(showResult, 500);
-        }
-
-        // ============================================================================
-        // UI Updates
-        // ============================================================================
-        function updateProgress(percent, message) {
-            document.getElementById("progressFill").style.width = percent + "%";
-            document.getElementById("progressText").textContent = Math.round(percent) + "%";
-            document.getElementById("statusMessage").textContent = message;
-        }
-
-        function showProcessing() {
-            document.getElementById("inputPanel").classList.add("hidden");
-            document.getElementById("processingPanel").classList.remove("hidden");
-            document.getElementById("resultPanel").classList.add("hidden");
-            updateProgress(0, "Starting...");
-        }
-
-        function showResult() {
-            document.getElementById("processingPanel").classList.add("hidden");
-            document.getElementById("resultPanel").classList.remove("hidden");
-            document.getElementById("resultImage").src = currentResultUrl;
         }
 
         function resetUI() {
@@ -838,36 +347,101 @@ function showResultManual(runId) {
             document.getElementById("resultPanel").classList.add("hidden");
             document.getElementById("promptInput").value = "";
             document.getElementById("fileInput").value = "";
-            document.getElementById("fileName").style.display = "none";
             document.getElementById("previewContainer").classList.remove("show");
-            uploadedImage = null;
+            document.getElementById("fileName").style.display = "none";
             uploadedImageDataUrl = null;
             checkFormReady();
-            clearError();
         }
 
-        function downloadResult() {
-            const a = document.createElement("a");
-            a.href = currentResultUrl;
-            a.download = `vheer_${Date.now()}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+        // ============================================================================
+        // Generation Logic
+        // ============================================================================
+        async function startGeneration() {
+            const prompt = document.getElementById("promptInput").value.trim();
+            if (!uploadedImageDataUrl || !prompt) return;
+
+            // Switch UI
+            document.getElementById("inputPanel").classList.add("hidden");
+            document.getElementById("processingPanel").classList.remove("hidden");
+            
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                if (progress < 90) {
+                    progress += Math.random() * 5;
+                    document.getElementById("progressFill").style.width = progress + "%";
+                }
+            }, 1000);
+
+            try {
+                document.getElementById("statusMessage").textContent = "Uploading to secure server...";
+                
+                // 1. Trigger Dispatch
+                const startRes = await fetch('/api/dispatch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, image_data: uploadedImageDataUrl })
+                });
+
+                const startData = await startRes.json();
+                if (!startRes.ok) throw new Error(startData.error || "Failed to start");
+
+                const runId = startData.run_id;
+                if (!runId) throw new Error("Could not get Run ID from server");
+
+                document.getElementById("statusMessage").textContent = "AI Engine started. Waiting for completion...";
+
+                // 2. Poll for Status
+                let attempts = 0;
+                const maxAttempts = 120; // 10 minutes max
+                
+                const poll = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const statusRes = await fetch(`/api/status?run_id=${runId}`);
+                        const statusData = await statusRes.json();
+
+                        if (statusData.status === 'completed') {
+                            clearInterval(poll);
+                            clearInterval(progressInterval);
+                            document.getElementById("progressFill").style.width = "100%";
+                            
+                            if (statusData.conclusion === 'success') {
+                                showSuccess(runId);
+                            } else {
+                                throw new Error("Workflow failed. Check GitHub logs.");
+                            }
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(poll);
+                            throw new Error("Timeout: AI took too long.");
+                        }
+                    } catch (err) {
+                        clearInterval(poll);
+                        alert("Error: " + err.message);
+                        location.reload();
+                    }
+                }, 5000);
+
+            } catch (error) {
+                clearInterval(progressInterval);
+                alert("Error: " + error.message);
+                location.reload();
+            }
         }
 
-        function showError(message) {
-            const panel = document.getElementById("errorPanel");
-            panel.textContent = "⚠ " + message;
-            panel.classList.remove("hidden");
+        function showSuccess(runId) {
+            document.getElementById("processingPanel").classList.add("hidden");
+            document.getElementById("resultPanel").classList.remove("hidden");
+            
+            const githubRunUrl = `https://github.com/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${runId}`;
+            
+            document.getElementById("finalStatus").innerHTML = `
+                ✅ <b>Generation Complete!</b><br>
+                Your image is ready in the GitHub Artifacts.<br>
+                <a href="${githubRunUrl}" target="_blank" style="color: var(--accent); text-decoration: underline; font-weight: bold;">
+                    Click here to Download Image
+                </a>
+            `;
         }
-
-        function clearError() {
-            document.getElementById("errorPanel").classList.add("hidden");
-        }
-
-        // Initialize
-        updateTokenStatus();
-        console.log("Page loaded - workflow file:", CONFIG.WORKFLOW_FILE);
     </script>
 </body>
 </html>
