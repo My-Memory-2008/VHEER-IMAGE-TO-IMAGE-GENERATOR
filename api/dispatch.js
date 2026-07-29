@@ -1,23 +1,27 @@
 export default async function handler(req, res) {
+  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, image_data } = req.body;
+  // Get the token from Vercel's secure storage
   const token = process.env.GITHUB_TOKEN;
 
   if (!token) {
-    console.error('❌ GITHUB_TOKEN environment variable is not set in Vercel');
-    return res.status(500).json({ error: 'Server configuration error: Missing GITHUB_TOKEN' });
+    console.error("❌ GITHUB_TOKEN is missing in Vercel Environment Variables");
+    return res.status(500).json({ error: 'Server configuration error' });
   }
 
   try {
+    const { prompt, image_data } = req.body;
+
+    // Trigger the GitHub Workflow
     const response = await fetch(
       `https://api.github.com/repos/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/workflows/vheer.yml/dispatches`,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`, // Changed to Bearer (more reliable than 'token')
+          'Authorization': `Bearer ${token}`, // Use Bearer for better compatibility
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
         },
@@ -32,18 +36,18 @@ export default async function handler(req, res) {
     );
 
     if (!response.ok) {
-      const errText = await response.text();
-      // ✅ THIS IS THE KEY: Log the actual GitHub error to Vercel logs
-      console.error(`❌ GitHub API Error (${response.status}):`, errText);
+      const errorText = await response.text();
+      console.error(`GitHub API Error: ${response.status} - ${errorText}`);
       return res.status(response.status).json({ 
-        error: `GitHub API Error: ${response.status}`,
-        details: errText 
+        error: 'Failed to trigger workflow', 
+        details: errorText 
       });
     }
 
     return res.status(200).json({ message: 'Workflow dispatched successfully' });
+
   } catch (error) {
-    console.error('❌ Dispatch Exception:', error.message);
+    console.error("Dispatch Exception:", error);
     return res.status(500).json({ error: error.message });
   }
 }
