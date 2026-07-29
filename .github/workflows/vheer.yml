@@ -58,86 +58,67 @@
 
 
 
-
-
-name: Vheer AI Image Processor
+name: Vheer Repository Image Generation Engine
 on:
-  issues:
-    types: [opened]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'AI Target Modification Prompt'
+        required: true
+        type: string
+      image_data:
+        description: 'Base64 Encoded Image Data'
+        required: true
+        type: string
 
 jobs:
-  process-image:
+  execute-pipeline:
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.body, 'VHEER_REQUEST') # Only run if it's a valid request
     steps:
-      - name: Checkout Code
+      - name: Checkout Code Tree
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Setup Python Runtime Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Dependencies
+      - name: Install Automation Dependencies
         run: |
           mkdir -p output
-          pip install playwright pillow
+          pip install playwright
           playwright install chromium --with-deps
 
-      - name: Extract Data from Issue
-        id: extract
+      - name: Run Complete Vheer Pipeline
         run: |
-          # Extract prompt and image data from the issue body
-          BODY="${{ github.event.issue.body }}"
+          # 1. Dynamically locate 'input-image' regardless of extension (.jpg, .png, etc.)
+          echo "Locating the repository base file..."
+          TARGET_FILE=$(find . -maxdepth 1 -iname "input-image*" -print -quit)
           
-          # Simple extraction using grep/sed (assuming specific format)
-          PROMPT=$(echo "$BODY" | grep -oP '(?<=PROMPT: ).*' || echo "default prompt")
-          IMAGE_DATA=$(echo "$BODY" | grep -oP '(?<=IMAGE_DATA: ).*' || echo "")
+          if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
+            echo "::error:: Could not find any root file starting with 'input-image'"
+            ls -la
+            exit 1
+          fi
           
-          echo "prompt=$PROMPT" >> $GITHUB_OUTPUT
-          echo "image_data=$IMAGE_DATA" >> $GITHUB_OUTPUT
-
-      - name: Prepare Input Image
-        run: |
-          CLEAN_DATA=$(echo "${{ steps.extract.outputs.image_data }}" | sed 's/^data:image\/[a-z]*;base64,//')
-          echo "$CLEAN_DATA" | base64 -d > input-image.png
-
-      - name: Run AI Pipeline
-        run: |
-          export DETECTED_IMAGE_FILE="input-image.png"
+          CLEAN_FILE_NAME=$(basename "$TARGET_FILE")
+          echo "Discovered file target: $CLEAN_FILE_NAME"
+          
+          # 2. Trigger the Python file within a Spoofed Virtual Display Buffer
+          export DETECTED_IMAGE_FILE="$CLEAN_FILE_NAME"
           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" python generator.py
         env:
-          PROMPT_TEXT: ${{ steps.extract.outputs.prompt }}
+          PROMPT_TEXT: ${{ inputs.prompt }}
           VHEER_AUTH_STATE: ${{ secrets.VHEER_AUTH_STATE }}
 
-      - name: Upload Result to Issue
-        uses: actions/github-script@v7
+      - name: Export Generated Output Graphic
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          script: |
-            const fs = require('fs');
-            const path = './output/generated_image.png'; // Adjust to your actual output path
-            
-            if (fs.existsSync(path)) {
-              const { data } = await github.rest.repos.uploadReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: null, // We'll use a different method for comments
-                name: 'result.png',
-                data: fs.readFileSync(path)
-              });
-              
-              // Actually, let's just comment with a link to the artifact or use a simple text response
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: '✅ **Processing Complete!** \n\nYour image has been generated. Since GitHub Issues don\'t support direct image embedding from Actions easily, please check the "Artifacts" tab of this workflow run to download your image.'
-              });
-            } else {
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: '❌ **Error:** The AI pipeline failed to generate an image. Please check the workflow logs.'
-              });
-            }
+          name: vheer-generated-output
+          path: output/
+          retention-days: 3
+
+
+
+
