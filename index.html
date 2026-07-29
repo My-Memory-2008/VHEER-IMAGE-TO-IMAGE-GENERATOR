@@ -396,52 +396,51 @@
                 
                 const poll = setInterval(async () => {
                     attempts++;
-                    try {
-                        const statusRes = await fetch(`/api/status?run_id=${runId}`);
-                        const statusData = await statusRes.json();
-
-                        if (statusData.status === 'completed') {
-                            clearInterval(poll);
-                            clearInterval(progressInterval);
-                            document.getElementById("progressFill").style.width = "100%";
-                            
-                            if (statusData.conclusion === 'success') {
-                                showSuccess(runId);
-                            } else {
-                                throw new Error("Workflow failed. Check GitHub logs.");
-                            }
-                        } else if (attempts >= maxAttempts) {
-                            clearInterval(poll);
-                            throw new Error("Timeout: AI took too long.");
-                        }
-                    } catch (err) {
+                    document.getElementById("statusMessage").textContent = `AI is working... (${attempts * 5}s elapsed)`;
+                    
+                    const statusRes = await fetch(`/api/status?run_id=${runId}`);
+                    const statusData = await statusRes.json();
+                
+                    if (statusData.status === 'success' && statusData.image_data) {
                         clearInterval(poll);
-                        alert("Error: " + err.message);
-                        location.reload();
+                        clearInterval(progressInterval);
+                        document.getElementById("progressFill").style.width = "100%";
+                        
+                        // DISPLAY THE IMAGE DIRECTLY
+                        document.getElementById("processingPanel").classList.add("hidden");
+                        document.getElementById("resultPanel").classList.remove("hidden");
+                        
+                        const imgElement = document.createElement("img");
+                        imgElement.src = statusData.image_data;
+                        imgElement.className = "result-image";
+                        
+                        const container = document.getElementById("resultImageContainer");
+                        container.innerHTML = ''; // Clear previous
+                        container.appendChild(imgElement);
+                
+                        // Update the download button to work with this blob
+                        window.currentResultSrc = statusData.image_data; 
+                
+                    } else if (statusData.conclusion === 'failure') {
+                        clearInterval(poll);
+                        throw new Error("Workflow failed. Check GitHub logs.");
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(poll);
+                        throw new Error("Timeout: AI took too long.");
                     }
                 }, 5000);
-
-            } catch (error) {
-                clearInterval(progressInterval);
-                alert("Error: " + error.message);
-                location.reload();
-            }
-        }
-
-        function showSuccess(runId) {
-            document.getElementById("processingPanel").classList.add("hidden");
-            document.getElementById("resultPanel").classList.remove("hidden");
-            
-            const githubRunUrl = `https://github.com/My-Memory-2008/VHEER-IMAGE-TO-IMAGE-GENERATOR/actions/runs/${runId}`;
-            
-            document.getElementById("finalStatus").innerHTML = `
-                ✅ <b>Generation Complete!</b><br>
-                Your image is ready in the GitHub Artifacts.<br>
-                <a href="${githubRunUrl}" target="_blank" style="color: var(--accent); text-decoration: underline; font-weight: bold;">
-                    Click here to Download Image
-                </a>
-            `;
-        }
+                
+                // Update the download function in HTML
+                function downloadResult() {
+                    if (window.currentResultSrc) {
+                        const a = document.createElement("a");
+                        a.href = window.currentResultSrc;
+                        a.download = `vheer_result_${Date.now()}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }
+                }
     </script>
 </body>
 </html>
