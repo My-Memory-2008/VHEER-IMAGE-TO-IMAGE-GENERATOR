@@ -6,6 +6,10 @@
         {
           "key": "Content-Security-Policy",
           "value": "frame-ancestors 'self' https://perchance.org/awram-ai-image-generator-0-pro"
+        },
+        {
+          "key":"X-Frame-Options",
+          "value":"ALLOWALL"
         }
       ]
     }
