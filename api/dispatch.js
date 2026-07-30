@@ -186,13 +186,6 @@
 // }
 
 
-const referer = req.headers.referer || "";
-const origin = req.headers.origin || "";
-const allowed = "https://perchance.org/awram-ai-image-generator-0-pro"; // your exact URL
-
-if (!referer.includes(allowed) && !origin.includes(allowed)) {
-  return res.status(403).json({ error: "Access denied" });
-}
 
 
 export default async function handler(req, res) {
