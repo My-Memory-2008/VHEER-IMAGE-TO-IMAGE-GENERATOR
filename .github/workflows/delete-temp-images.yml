@@ -1,6 +1,9 @@
 name: Delete Old Temp Images
 
 on:
+schedule:
+    # Runs every 3 days at 03:17 AM UTC (Low traffic, odd minute to avoid delays)
+    - cron: '17 3 */3 * *'
   
   workflow_dispatch: # Allows you to run it manually
 
