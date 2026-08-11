@@ -1,0 +1,55 @@
+name: Delete Old Temp Images
+
+on:
+  
+  workflow_dispatch: # Allows you to run it manually
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to commit the deletions
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches full history to read commit dates
+
+      - name: Find and Delete Old Temp Images
+        run: |
+          # Calculate the timestamp for 7 days ago
+          THRESHOLD_DATE=$(date -d "7 days ago" +%s)
+          echo "Checking for files older than: $(date -d "7 days ago")"
+          
+          # Find all files containing 'temp_input' in the name
+          find . -type f -name "*temp_input*" | while read -r file; do
+            # Get the timestamp of the last commit for this file
+            FILE_DATE=$(git log -1 --format="%at" -- "$file")
+            
+            # If the file is untracked or new, skip it
+            if [ -z "$FILE_DATE" ]; then
+              continue
+            fi
+
+            # Compare dates
+            if [ "$FILE_DATE" -lt "$THRESHOLD_DATE" ]; then
+              echo "Deleting old file: $file"
+              git rm "$file"
+            else
+              echo "Keeping newer file: $file"
+            fi
+          done
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@://github.com"
+          
+          # Check if any files were deleted before committing
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: automated cleanup of old temp_input images"
+            git push
+          else
+            echo "No old temp images found to delete."
+          fi
