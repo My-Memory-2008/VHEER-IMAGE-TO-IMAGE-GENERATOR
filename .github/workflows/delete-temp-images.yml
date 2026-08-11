@@ -1,7 +1,7 @@
 name: Delete Old Temp Images
 
 on:
-schedule:
+  schedule:
     # Runs every 3 days at 03:17 AM UTC (Low traffic, odd minute to avoid delays)
     - cron: '17 3 */3 * *'
   
