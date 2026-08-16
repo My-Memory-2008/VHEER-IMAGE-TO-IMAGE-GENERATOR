@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -257,7 +257,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
+        
         <div class="navbar">
             <div class="logo">✨ Vheer AI</div>
             <div class="status-badge">
@@ -266,7 +266,7 @@
             </div>
         </div>
 
-        <!-- Input Panel -->
+        
         <div class="card" id="inputPanel">
             <h2>Image Transformation</h2>
             <p class="card-description">Upload an image and describe the change</p>
@@ -292,7 +292,7 @@
             </button>
         </div>
 
-        <!-- Processing Panel -->
+        
         <div class="card hidden" id="processingPanel">
             <h2>Processing...</h2>
             <div class="progress-container">
@@ -303,7 +303,7 @@
             </div>
         </div>
 
-        <!-- Result Panel -->
+        
         <div class="card hidden" id="resultPanel">
             <h2 style="color: var(--success); margin-bottom: 15px;">✓ Complete!</h2>
             <img id="resultImage" class="result-image" src="" alt="Generated AI Image">
@@ -383,6 +383,537 @@
                 };
                 img.src = dataUrl;
             });
+        }
+
+        // ============================================================================
+        // Main Logic
+        // ============================================================================
+        async function startGeneration() {
+            const prompt = document.getElementById("promptInput").value.trim();
+            if (!uploadedImageDataUrl || !prompt) return;
+
+            document.getElementById("inputPanel").classList.add("hidden");
+            document.getElementById("processingPanel").classList.remove("hidden");
+            
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                if (progress < 90) {
+                    progress += Math.random() * 2;
+                    document.getElementById("progressFill").style.width = progress + "%";
+                }
+            }, 1000);
+
+            try {
+                document.getElementById("statusMessage").textContent = "Compressing image...";
+                const compressedImage = await compressImage(uploadedImageDataUrl);
+                
+                document.getElementById("statusMessage").textContent = "Uploading to secure server...";
+                
+                const startRes = await fetch('/api/dispatch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, image_data: compressedImage })
+                });
+
+                const startData = await startRes.json();
+                if (!startRes.ok) throw new Error(startData.error || "Failed to start");
+
+                const runId = startData.run_id;
+                if (!runId) throw new Error("Could not get Run ID");
+
+                document.getElementById("statusMessage").textContent = "AI Engine started. Waiting for completion...";
+
+                let attempts = 0;
+                const maxAttempts = 120; // 10 minutes
+
+                const poll = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const statusRes = await fetch(`/api/status?run_id=${runId}`);
+                        const statusData = await statusRes.json();
+
+                        // Check if we have the image data from the artifact
+                        if (statusData.status === 'success' && statusData.image_data) {
+                            clearInterval(poll);
+                            clearInterval(progressInterval);
+                            document.getElementById("progressFill").style.width = "100%";
+                            
+                            // Display the image directly
+                            currentResultSrc = statusData.image_data;
+                            document.getElementById("processingPanel").classList.add("hidden");
+                            document.getElementById("resultPanel").classList.remove("hidden");
+                            document.getElementById("resultImage").src = currentResultSrc;
+
+                        } else if (statusData.conclusion === 'failure') {
+                            clearInterval(poll);
+                            throw new Error("Workflow failed. Check GitHub logs.");
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(poll);
+                            throw new Error("Timeout: AI took too long.");
+                        }
+                    } catch (err) {
+                        clearInterval(poll);
+                        alert("Error: " + err.message);
+                        location.reload();
+                    }
+                }, 5000);
+
+            } catch (error) {
+                clearInterval(progressInterval);
+                alert("Error: " + error.message);
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html> -->
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vheer AI Image Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0f172a;
+            --bg-secondary: #1e293b;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg) 0%, #1a1f3a 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--success);
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .card h2 {
+            font-size: 22px;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .card-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: var(--text);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            background: rgba(37, 99, 235, 0.05);
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        /* Drag and Drop Visual Feedback */
+        .upload-zone.drag-over {
+            border-color: var(--success);
+            border-style: solid;
+            background: rgba(16, 185, 129, 0.15);
+            transform: scale(1.02);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .preview-container {
+            display: none;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+        }
+
+        .preview-container.show {
+            display: block;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        button {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:disabled {
+            background: var(--border);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+            margin-top: 10px;
+        }
+
+        .progress-container {
+            margin-top: 20px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--bg);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--success));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .status-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .result-image {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .file-selected {
+            color: var(--success);
+            font-size: 13px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="navbar">
+            <div class="logo">✨ Vheer AI</div>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                Public Mode
+            </div>
+        </div>
+
+        <!-- Input Panel -->
+        <div class="card" id="inputPanel">
+            <h2>Image Transformation</h2>
+            <p class="card-description">Upload an image and describe the change</p>
+
+            <div class="form-group">
+                <label>Prompt</label>
+                <textarea id="promptInput" placeholder="e.g., Remove the jacket..." oninput="checkFormReady()"></textarea>
+            </div>
+
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <div style="font-size: 32px;">📷</div>
+                <div>Click or drag & drop to upload Image</div>
+                <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+            </div>
+
+            <div class="preview-container" id="previewContainer">
+                <img id="previewImage" class="preview-image" src="" alt="Preview">
+            </div>
+            <div id="fileName" class="file-selected" style="display: none;"></div>
+
+            <button class="btn-primary" id="generateBtn" onclick="startGeneration()" disabled>
+                🚀 Generate Image
+            </button>
+        </div>
+
+        <!-- Processing Panel -->
+        <div class="card hidden" id="processingPanel">
+            <h2>Processing...</h2>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="status-message" id="statusMessage">Initializing...</div>
+            </div>
+        </div>
+
+        <!-- Result Panel -->
+        <div class="card hidden" id="resultPanel">
+            <h2 style="color: var(--success); margin-bottom: 15px;">✓ Complete!</h2>
+            <img id="resultImage" class="result-image" src="" alt="Generated AI Image">
+            
+            <button class="btn-success" onclick="downloadResult()">📥 Download Image</button>
+            <button class="btn-primary" onclick="resetUI()" style="background: var(--bg-secondary); border: 1px solid var(--border); margin-top: 10px;">✎ Another Image</button>
+        </div>
+    </div>
+
+    <script>
+        let uploadedImageDataUrl = null;
+        let currentResultSrc = null;
+
+        // ============================================================================
+        // UI Helpers
+        // ============================================================================
+        function checkFormReady() {
+            const hasImage = uploadedImageDataUrl !== null;
+            const hasPrompt = document.getElementById("promptInput").value.trim().length > 0;
+            document.getElementById("generateBtn").disabled = !(hasImage && hasPrompt);
+        }
+
+        function handleFileSelect(event) {
+            let file;
+            // Handle standard click input
+            if (event.target && event.target.files && event.target.files.length > 0) {
+                file = event.target.files[0];
+            } 
+            // Handle drag and drop input
+            else if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+                file = event.dataTransfer.files[0];
+            }
+            
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImageDataUrl = e.target.result;
+                document.getElementById("previewImage").src = uploadedImageDataUrl;
+                document.getElementById("previewContainer").classList.add("show");
+                document.getElementById("fileName").textContent = "✓ " + file.name;
+                document.getElementById("fileName").style.display = "block";
+                checkFormReady();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetUI() {
+            document.getElementById("inputPanel").classList.remove("hidden");
+            document.getElementById("processingPanel").classList.add("hidden");
+            document.getElementById("resultPanel").classList.add("hidden");
+            document.getElementById("promptInput").value = "";
+            document.getElementById("fileInput").value = "";
+            document.getElementById("previewContainer").classList.remove("show");
+            document.getElementById("fileName").style.display = "none";
+            document.getElementById("resultImage").src = "";
+            uploadedImageDataUrl = null;
+            currentResultSrc = null;
+            checkFormReady();
+        }
+
+        function downloadResult() {
+            if (currentResultSrc) {
+                const a = document.createElement("a");
+                a.href = currentResultSrc;
+                a.download = `vheer_result_${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+
+        // Compress image to stay under Vercel's 4.5MB limit
+        async function compressImage(dataUrl) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxWidth = 1024;
+                    const ratio = Math.min(maxWidth / img.width, 1);
+                    canvas.width = img.width * ratio;
+                    canvas.height = img.height * ratio;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.src = dataUrl;
+            });
+        }
+
+        // ============================================================================
+        // Drag and Drop Logic
+        // ============================================================================
+        const uploadZone = document.getElementById('uploadZone');
+
+        // Prevent default browser behavior for drag events (prevents opening image in new tab)
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, highlight, false);
+        });
+
+        // Unhighlight drop zone when item leaves or is dropped
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            uploadZone.classList.add('drag-over');
+        }
+
+        function unhighlight() {
+            uploadZone.classList.remove('drag-over');
+        }
+
+        // Handle the actual drop
+        uploadZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            handleFileSelect(e);
         }
 
         // ============================================================================
